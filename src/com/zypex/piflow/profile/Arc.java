@@ -3,6 +3,7 @@ package com.zypex.piflow.profile;
 import com.zypex.piflow.DrivetrainConfig;
 import utils.math.BoundedFunction;
 import utils.math.Function;
+import utils.math.SingleBoundedFunction;
 import utils.math.Vector;
 
 public class Arc extends ProfileSegment {
@@ -15,10 +16,9 @@ public class Arc extends ProfileSegment {
     private final double coeff;
     private final double speed;
     public final double diff;
-    private final double offset;
 
-    Arc(Function<Derivatives<Vector>> function, double coeff, double speed, double diff, int dir, Vector center) {
-        super(function, 0, Math.abs(diff) / coeff, speed / coeff * Math.abs(diff));
+    Arc(SingleBoundedFunction<Derivatives<Vector>> function, double coeff, double speed, double diff, int dir, Vector center) {
+        super(function, Math.abs(diff) / coeff);
 
         this.center = center;
         this.radius = speed / coeff;
@@ -26,19 +26,25 @@ public class Arc extends ProfileSegment {
         this.coeff = coeff;
         this.speed = speed;
         this.diff = diff;
-        this.offset = 0;
     }
 
-    Arc(Arc arc, double offset){
-        super(t -> arc.function.get(t - offset), offset, Math.abs(arc.diff) / arc.coeff + offset, arc.speed / arc.coeff * Math.abs(arc.diff));
 
-        this.center = arc.center;
-        this.radius = arc.speed / arc.coeff;
-        this.dir = arc.dir;
-        this.coeff = arc.coeff;
-        this.speed = arc.speed;
-        this.diff = arc.diff;
-        this.offset = offset;
+
+//    Arc(Arc arc, double offset){
+//        super(t -> arc.function.get(t - offset), offset, Math.abs(arc.diff) / arc.coeff + offset, arc.speed / arc.coeff * Math.abs(arc.diff));
+//
+//        this.center = arc.center;
+//        this.radius = arc.speed / arc.coeff;
+//        this.dir = arc.dir;
+//        this.coeff = arc.coeff;
+//        this.speed = arc.speed;
+//        this.diff = arc.diff;
+//        this.offset = offset;
+//    }
+
+    @Override
+    public Arc offset(double offset) {
+        return new Arc((SingleBoundedFunction<Derivatives<Vector>>) function.offset(offset), coeff, speed, diff, dir, center);
     }
 
     @Override
@@ -46,8 +52,8 @@ public class Arc extends ProfileSegment {
         final Vector direction = pos.subtract(center).normalize();
         final double theta;
 
-        final double iTheta = get(lowerBound).position.subtract(center).getTheta();
-        final double fTheta = get(upperBound).position.subtract(center).getTheta();
+        final double iTheta = get(lowerBound()).position.subtract(center).getTheta();
+        final double fTheta = get(upperBound()).position.subtract(center).getTheta();
 
         if(angleDiff(direction.getTheta(), iTheta) + angleDiff(fTheta, direction.getTheta()) == angleDiff(fTheta, iTheta)){
             theta = direction.getTheta();
@@ -66,10 +72,10 @@ public class Arc extends ProfileSegment {
 
 //        System.out.println("( " + iTheta + ", " + fTheta + ")");
 
-        return (theta - iTheta) / (dir * coeff) + offset;
+        return (theta - iTheta) / (dir * coeff) + lowerBound();
     }
 
-//    Change back to private future roshan
+    //    Change back to private future roshan
     private double angleDiff(double finalTheta, double initialTheta){
         final double pi2 = 2 * Math.PI;
 

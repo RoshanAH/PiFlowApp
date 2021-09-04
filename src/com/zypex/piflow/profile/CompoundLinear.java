@@ -10,22 +10,28 @@ import java.util.List;
 
 public class CompoundLinear extends ProfileSegment {
 
-    List<Linear> segments;
+    public final PiecewiseFunction<Derivatives<Vector>> function;
 
-    CompoundLinear(List<Linear> segments, Function<Derivatives<Vector>> function, double lower, double upper, double length) {
-        super(function, lower, upper, length);
-        if(segments.size() < 2) throw new IllegalArgumentException("Cannot create CompoundLinear of length " + segments.size());
-        this.segments = segments;
+    CompoundLinear(PiecewiseFunction<Derivatives<Vector>> function, double length) {
+        super(function, length);
+        this.function = function;
     }
 
     @Override
     public double getT(Vector pos) {
         final double t;
 
-        for(Linear l : segments){
-
-        }
+//        for(Linear l : function.functions){
+//
+//        }
 
         return 0;
+    }
+
+    @Override
+    public BoundedFunction<Derivatives<Vector>> offset(double offset) {
+        PiecewiseFunction<Derivatives<Vector>> outFunction = new PiecewiseFunction<>();
+        function.functions.forEach(f -> outFunction.addFunction(f.offset(offset)));
+        return new CompoundLinear(outFunction, length);
     }
 }

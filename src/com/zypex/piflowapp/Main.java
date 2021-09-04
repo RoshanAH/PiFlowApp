@@ -33,7 +33,7 @@ public class Main extends Application {
     private final double initialHeight = 600;
     private final double initialWidth = 600;
 
-    private DrivetrainConfig config = new DrivetrainConfig(3, 5, 3);
+    private DrivetrainConfig config = new DrivetrainConfig(3, 2, 3);
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -87,6 +87,7 @@ public class Main extends Application {
     }
 
     FunctionRenderer renderer = new FunctionRenderer(0, 0, 600, 600);
+    BoundedFunction<Derivatives<Double>> profile = ProfileBuilder.CreateVelocityChange(0, 5, config);
     List<Vector> points = new ArrayList<>();
     List<Vector> centers = new ArrayList<>();
     List<Arc> arcs = new ArrayList<>();
@@ -125,7 +126,7 @@ public class Main extends Application {
         arcs = ProfileBuilder.CreateInterpolation(points, config, config.maxVelocity);
 
         for(Arc arc : arcs){
-            renderer.functions.add(new RenderedFunction(arc.lowerBound, arc.upperBound)
+            renderer.functions.add(new RenderedFunction(arc.lowerBound(), arc.upperBound())
                     .attachX(t -> arc.get(t).position.x)
                     .attachY(t -> arc.get(t).position.y)
                     .setSize(2)
@@ -133,25 +134,12 @@ public class Main extends Application {
             );
         }
 
-//        for(int i = 0; i < points.size() - 2; i++){
-//            final Vector start = points.get(i);
-//            final Vector middle = points.get(i + 1);
-//            final Vector end = points.get(i + 2);
-//            final Vector turnCenter = ProfileBuilder.FindTurnCenter(start, middle, end, config, config.maxVelocity);
-//
-//            final Function<Vector> func;
-//
-//            if(i == 0) func = t -> middle.subtract(start).normalize().scale(t).add(turnCenter);
-//            else if (i == points.size() - 3) func = t -> middle.subtract(end).normalize().scale(t).add(turnCenter);
-//            else func = t -> start.subtract(middle).normalize().add(end.subtract(middle).normalize()).normalize().scale(-t).add(turnCenter);
-//
-////            renderer.functions.add(new RenderedFunction(0, 5)
-////                    .attachX(t -> func.get(t).x)
-////                    .attachY(t -> func.get(t).y)
-////                    .setColor(Color.GREY)
-////                    .attachSize(t -> 3 + t)
-////            );
-//        }
+//        renderer.functions.add(new RenderedFunction(profile.lowerBound(), profile.upperBound())
+//                .attachX(t -> t)
+//                .attachY(t -> profile.get(t).position)
+//                .setSize(2)
+//                .setColor(Color.BLUE)
+//        );
 
         centers = calcCenters();
 

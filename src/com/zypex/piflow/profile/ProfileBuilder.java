@@ -2,10 +2,7 @@ package com.zypex.piflow.profile;
 
 import com.zypex.piflow.DrivetrainConfig;
 import com.zypex.piflow.path.Path;
-import utils.math.BoundedFunction;
-import utils.math.Function;
-import utils.math.PiecewiseFunction;
-import utils.math.Vector;
+import utils.math.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -24,7 +21,7 @@ public class ProfileBuilder {
 
     }
 
-    private static Linear CreateDisplacement(Vector start, Vector end, double startSpeed, double endSpeed, double maxSpeed, DrivetrainConfig config){
+    private static Linear CreateDisplacement(Vector start, Vector end, double startSpeed, double endSpeed, double maxSpeed, DrivetrainConfig config) {
 
         return null;
     }
@@ -42,13 +39,12 @@ public class ProfileBuilder {
         final double dir1 = deltaStart.clone().scale(tStart).add(middle).subtract(center).getTheta();
         final double dir2 = deltaEnd.clone().scale(tEnd).add(middle).subtract(center).getTheta();
 
-        return CreateArc(center, dir1, dir2, (int)Math.signum(FindAngleDifference(deltaStart.getTheta(), deltaEnd.getTheta())), config, speed);
+        return CreateArc(center, dir1, dir2, (int) Math.signum(FindAngleDifference(deltaStart.getTheta(), deltaEnd.getTheta())), config, speed);
 
     }
 
 
-
-    private static Arc CreateArc(Vector center, double initialTheta, double finalTheta, int dir, DrivetrainConfig config, double speed){
+    private static Arc CreateArc(Vector center, double initialTheta, double finalTheta, int dir, DrivetrainConfig config, double speed) {
 
         final int tSign = Integer.signum(dir);
         final double pi2 = 2 * Math.PI;
@@ -62,7 +58,7 @@ public class ProfileBuilder {
 
         final double r = speed / coeff;
 
-        return new Arc(t -> new Derivatives<>(
+        SingleBoundedFunction<Derivatives<Vector>> function = new SingleBoundedFunction<>(t -> new Derivatives<>(
                 new Vector(
                         speed / coeff * Math.cos(tSign * coeff * t + initialTheta) + center.x,
                         speed / coeff * Math.sin(tSign * coeff * t + initialTheta) + center.y
@@ -79,17 +75,19 @@ public class ProfileBuilder {
                         tSign * speed * coeff * coeff * Math.sin(tSign * coeff * t + initialTheta),
                         -tSign * speed * coeff * coeff * Math.cos(tSign * coeff * t + finalTheta)
                 )
-        ), coeff, speed, diff, tSign, center);
+        ), 0, Math.abs(diff) / speed);
+
+        return new Arc(function, coeff, speed, diff, tSign, center);
     }
 
-    public static List<Arc> CreateInterpolation(List<Vector> points, DrivetrainConfig config, double speed){
-        if(points.size() < 4) throw new IllegalArgumentException("An interpolation must have at least 2 turns");
+    public static List<Arc> CreateInterpolation(List<Vector> points, DrivetrainConfig config, double speed) {
+        if (points.size() < 4) throw new IllegalArgumentException("An interpolation must have at least 2 turns");
 
         List<Solution> solutions = new ArrayList<>();
 
         final double r = FindTurningRadius(config, speed);
 
-        for(int i = 0; i < points.size() - 2; i++){
+        for (int i = 0; i < points.size() - 2; i++) {
             final Vector start = points.get(i);
             final Vector middle = points.get(i + 1);
             final Vector end = points.get(i + 2);
@@ -97,11 +95,12 @@ public class ProfileBuilder {
 
             final Vector slope;
 
-            if(i == 0) slope = middle.subtract(start).normalize();
+            if (i == 0) slope = middle.subtract(start).normalize();
             else if (i == points.size() - 3) slope = middle.subtract(end).normalize();
             else slope = start.subtract(middle).normalize().add(end.subtract(middle).normalize()).normalize().scale(-1);
 
-            if(i >= 1){;
+            if (i >= 1) {
+                ;
                 final Solution last = solutions.get(i - 1);
                 final Vector scaledSlope = last.slope.scale(1d / (i));
 
@@ -114,11 +113,11 @@ public class ProfileBuilder {
                 final double t2 = (-b + det) / (2 * a);
 
                 final double t;
-                if(Math.abs(t1) < Math.abs(t2)) t = t1;
+                if (Math.abs(t1) < Math.abs(t2)) t = t1;
                 else t = t2;
 
                 solutions.add(new Solution(initial, slope, t));
-            }else{
+            } else {
                 solutions.add(new Solution(initial, slope, 0));
             }
         }
@@ -126,7 +125,7 @@ public class ProfileBuilder {
         List<Vector> centers = new ArrayList<>();
         centers.add(solutions.get(solutions.size() - 1).getPoint());
 
-        for(int i = solutions.size() - 2; i >= 0; i--){
+        for (int i = solutions.size() - 2; i >= 0; i--) {
             Vector next = centers.get(0);
             Solution current = solutions.get(i);
 
@@ -139,7 +138,7 @@ public class ProfileBuilder {
             final double t2 = (-b + determinate) / (2 * a);
 
             final double t;
-            if(Math.abs(t1) < Math.abs(t2)) t = t1;
+            if (Math.abs(t1) < Math.abs(t2)) t = t1;
             else t = t2;
 
             centers.add(0, current.get(t));
@@ -158,10 +157,10 @@ public class ProfileBuilder {
             final Vector deltaStart = points.get(0).subtract(points.get(1));
             final Vector deltaEnd = points.get(2).subtract(points.get(1));
 
-            arcs.add(CreateArc(center, dir1, dir2, (int)Math.signum(FindAngleDifference(deltaStart.getTheta(), deltaEnd.getTheta())), config, speed));
+            arcs.add(CreateArc(center, dir1, dir2, (int) Math.signum(FindAngleDifference(deltaStart.getTheta(), deltaEnd.getTheta())), config, speed));
         }
 
-        for(int i = 1; i < centers.size() - 1; i++){
+        for (int i = 1; i < centers.size() - 1; i++) {
             final Vector last = centers.get(i - 1);
             final Vector current = centers.get(i);
             final Vector next = centers.get(i + 1);
@@ -170,7 +169,7 @@ public class ProfileBuilder {
             final double dir1 = last.subtract(current).getTheta();
             final double dir2 = next.subtract(current).getTheta();
 
-            arcs.add(CreateArc(current, dir1, dir2, -arcs.get(i - 1).dir,config, speed));
+            arcs.add(CreateArc(current, dir1, dir2, -arcs.get(i - 1).dir, config, speed));
         }
 
         {
@@ -222,16 +221,16 @@ public class ProfileBuilder {
         return closest.clone().add(middle);
     }
 
-    public static double FindAngleDifference(double angle2, double angle1){
+    public static double FindAngleDifference(double angle2, double angle1) {
 
         angle2 = (angle2 % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
         angle1 = (angle1 % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
 
         final double rawDiff = angle2 - angle1;
 
-        if(Math.abs(rawDiff) < Math.PI){
+        if (Math.abs(rawDiff) < Math.PI) {
             return rawDiff;
-        }else{
+        } else {
             return rawDiff - Math.signum(rawDiff) * 2 * Math.PI;
         }
     }
@@ -250,7 +249,7 @@ public class ProfileBuilder {
                     config.maxJerk * Math.signum(deltaVel) // Increasing accel
             ), 0, maxAccel / config.maxJerk);
 
-            final Derivatives<Double> endPoint1 = out.get(out.functions.get(0).upperBound);
+            final Derivatives<Double> endPoint1 = out.get(out.functions.get(0).upperBound());
 
             out.appendFunction(t -> new Derivatives<>(
                     endPoint1.position +
@@ -276,7 +275,7 @@ public class ProfileBuilder {
                     config.maxJerk * Math.signum(deltaVel) // Increasing accel
             ), 0, config.maxAcceleration / config.maxJerk);
 
-            final Derivatives<Double> endPoint1 = out.get(out.functions.get(0).upperBound);
+            final Derivatives<Double> endPoint1 = out.get(out.functions.get(0).upperBound());
 
             out.appendFunction(t -> new Derivatives<>(
                     endPoint1.position +
@@ -290,7 +289,7 @@ public class ProfileBuilder {
                     0d // Constant accel
             ), 0, deltaVel / config.maxAcceleration - config.maxAcceleration / config.maxJerk);
 
-            final Derivatives<Double> endPoint2 = out.get(out.functions.get(1).upperBound);
+            final Derivatives<Double> endPoint2 = out.get(out.functions.get(1).upperBound());
 
             out.appendFunction(t -> new Derivatives<>(
                     endPoint2.position +
@@ -309,7 +308,7 @@ public class ProfileBuilder {
             ), 0, config.maxAcceleration / config.maxJerk);
         }
 
-        return out.toBounded();
+        return out;
     }
 
     public static double FindTurningRadius(DrivetrainConfig config, double speed) {
@@ -331,26 +330,27 @@ public class ProfileBuilder {
         return new Profile(profile, headingProfile);
     }
 
-    private static class Solution implements Function<Vector>{
+    private static class Solution implements Function<Vector> {
         Vector initial;
         Vector slope;
         double t;
 
-        Solution(Vector initial, Vector slope, double t){
+        Solution(Vector initial, Vector slope, double t) {
             this.initial = initial;
             this.slope = slope;
             this.t = t;
         }
 
-        Vector getPoint(){
+        Vector getPoint() {
             return slope.scale(t).add(initial);
         }
 
-        public String toString(){
+        public String toString() {
             return getPoint().toString();
         }
 
-        public Vector get(Double t){
+        @Override
+        public Vector get(double t) {
             return initial.add(slope.scale(t));
         }
     }
