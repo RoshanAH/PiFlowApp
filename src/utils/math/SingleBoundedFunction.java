@@ -4,17 +4,17 @@ public class SingleBoundedFunction<T> implements BoundedFunction<T>{
 
     private final double upper;
     private final double lower;
-    private final Function<T> function;
+    private final Function<T> base;
 
-    public SingleBoundedFunction(Function<T> f, double lower, double upper) {
-        this.function = f;
+    public SingleBoundedFunction(Function<T> baseFunction, double lower, double upper) {
+        this.base = baseFunction;
         this.lower = lower;
         this.upper = upper;
     }
 
     @Override
     public SingleBoundedFunction<T> offset(double offset) {
-        return new SingleBoundedFunction<>(t -> function.get(t - offset), lower + offset, upper + offset);
+        return new SingleBoundedFunction<>(t -> base.get(t - offset), lower + offset, upper + offset);
     }
 
     @Override
@@ -29,7 +29,7 @@ public class SingleBoundedFunction<T> implements BoundedFunction<T>{
 
     @Override
     public T get(double input) {
-        if(input >= lower && input <= upper) return function.get(input);
+        if(input >= lower && input <= upper) return base.get(input);
         throw new InputOutOfDomainException("Input " + input + " out of domain [" + lower + ", " + upper + "]");
     }
 
