@@ -21,7 +21,7 @@ public class ProfileBuilder {
 
     }
 
-    private static Linear CreateDisplacement(Vector start, Vector end, double startSpeed, double endSpeed, double maxSpeed, DrivetrainConfig config) {
+    private static PiecewiseFunction<Derivatives<Double>> CreateDisplacement(Vector start, Vector end, double startSpeed, double endSpeed, double maxSpeed, DrivetrainConfig config) {
 
         return null;
     }
@@ -235,23 +235,24 @@ public class ProfileBuilder {
         }
     }
 
-    public static BoundedFunction<Derivatives<Double>> CreateVelocityChange(double initialVel, double finalVel, DrivetrainConfig config) {
-        PiecewiseFunction<Derivatives<Double>> out = new PiecewiseFunction<>();
+    public static PiecewiseFunction<Derivatives<Double>> CreateVelocityChange(double initialVel, double finalVel, DrivetrainConfig config) {
         final double deltaVel = finalVel - initialVel;
 
         final double maxAccel = Math.signum(deltaVel) * Math.sqrt(config.maxJerk * Math.abs(deltaVel));
 
         if (Math.abs(maxAccel) <= config.maxAcceleration) {
-            out.addFunction(t -> new Derivatives<>(
+
+            final BoundedFunction<Derivatives<Double>> accelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
                     config.maxJerk * Math.pow(t, 3) / 6 * Math.signum(deltaVel),
                     initialVel + config.maxJerk * Math.pow(t, 2) / 2 * Math.signum(deltaVel), // Increasing position
                     config.maxJerk * t * Math.signum(deltaVel), // Increasing vel
                     config.maxJerk * Math.signum(deltaVel) // Increasing accel
             ), 0, maxAccel / config.maxJerk);
 
-            final Derivatives<Double> endPoint1 = out.get(out.functions.get(0).upperBound());
 
-            out.appendFunction(t -> new Derivatives<>(
+            final Derivatives<Double> endPoint1 = accelerate.getUpper();
+
+            final BoundedFunction<Derivatives<Double>> decelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
                     endPoint1.position +
                             endPoint1.velocity * t +
                             endPoint1.acceleration * Math.pow(t, 2) / 2 +
@@ -266,18 +267,20 @@ public class ProfileBuilder {
 
                     config.maxJerk * Math.signum(-deltaVel) // Decreasing accel
             ), 0, maxAccel / config.maxJerk);
+
+            return PiecewiseFunction.createAppended(accelerate, decelerate);
         } else {
 
-            out.addFunction(t -> new Derivatives<>(
+            final BoundedFunction<Derivatives<Double>> accelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
                     config.maxJerk * Math.pow(t, 3) / 6 * Math.signum(deltaVel),
                     initialVel + config.maxJerk * Math.pow(t, 2) / 2 * Math.signum(deltaVel), // Increasing position
                     config.maxJerk * t * Math.signum(deltaVel), // Increasing vel
                     config.maxJerk * Math.signum(deltaVel) // Increasing accel
             ), 0, config.maxAcceleration / config.maxJerk);
 
-            final Derivatives<Double> endPoint1 = out.get(out.functions.get(0).upperBound());
+            final Derivatives<Double> endPoint1 = accelerate.getUpper();
 
-            out.appendFunction(t -> new Derivatives<>(
+            final BoundedFunction<Derivatives<Double>> maintain = new SingleBoundedFunction<>(t -> new Derivatives<>(
                     endPoint1.position +
                             endPoint1.velocity * t +
                             config.maxAcceleration * Math.pow(t, 2) / 2 * Math.signum(deltaVel),
@@ -289,9 +292,9 @@ public class ProfileBuilder {
                     0d // Constant accel
             ), 0, deltaVel / config.maxAcceleration - config.maxAcceleration / config.maxJerk);
 
-            final Derivatives<Double> endPoint2 = out.get(out.functions.get(1).upperBound());
+            final Derivatives<Double> endPoint2 = maintain.getUpper();
 
-            out.appendFunction(t -> new Derivatives<>(
+            final BoundedFunction<Derivatives<Double>> decelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
                     endPoint2.position +
                             endPoint2.velocity * t +
                             endPoint2.acceleration * Math.pow(t, 2) / 2 +
@@ -306,9 +309,9 @@ public class ProfileBuilder {
 
                     config.maxJerk * Math.signum(-deltaVel) // Decreasing accel
             ), 0, config.maxAcceleration / config.maxJerk);
-        }
 
-        return out;
+            return PiecewiseFunction.createAppended(accelerate, maintain, decelerate);
+        }
     }
 
     public static double FindTurningRadius(DrivetrainConfig config, double speed) {
