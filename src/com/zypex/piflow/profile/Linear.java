@@ -2,14 +2,11 @@ package com.zypex.piflow.profile;
 
 import utils.math.*;
 
-import java.util.ArrayList;
-import java.util.List;
-
 public class Linear extends ProfileSegment {
 
     public final SingleBoundedFunction<Derivatives<Vector>> function;
 
-//    For the format of ax^3 + bx^2 + cx + d
+//    For the format of (1/6)ax^3 + (1/2)bx^2 + cx + d
     public final double a;
     public final double b;
     public final double c;
@@ -46,6 +43,6 @@ public class Linear extends ProfileSegment {
 
     @Override
     public BoundedFunction<Derivatives<Vector>> offset(double offset) {
-        return null;
+        return new Linear(function.offset(offset), length);
     }
 }
