@@ -7,6 +7,14 @@ public class PiecewiseFunction<T> implements BoundedFunction<T>{
 
     public final List<BoundedFunction<T>> functions = new ArrayList<>();
 
+    @SafeVarargs
+    public PiecewiseFunction(BoundedFunction<T>... functions){
+        for(BoundedFunction<T> f : functions) addFunction(f);
+    }
+
+    public PiecewiseFunction(){}
+
+
     public void addFunction(Function<T> f, double min, double max) {
         if (f instanceof BoundedFunction)
             addFunction((BoundedFunction<T>) f);
@@ -80,12 +88,19 @@ public class PiecewiseFunction<T> implements BoundedFunction<T>{
         return out;
     }
 
+    @SafeVarargs
+    public static <T> PiecewiseFunction<T> createAppended(BoundedFunction<T>... functions){
+        PiecewiseFunction<T> out = new PiecewiseFunction<>();
+        for(BoundedFunction<T> f : functions) out.appendFunction(f);
+        return out;
+    }
+
     //    Prioritize the most recently added functions if they overlap
     @Override
     public T get(double input) {
         for (int i = functions.size() - 1; i >= 0; i--) {
-            T output = functions.get(i).get(input);
-            if (output != null) return output;
+            BoundedFunction<T> f = functions.get(i);
+            if(input >= f.lowerBound() && input <= f.upperBound()) return f.get(input);
         }
 
         throw new InputOutOfDomainException("Input " + input + " out of domain [" + lowerBound() + ", " + upperBound() + "]");
