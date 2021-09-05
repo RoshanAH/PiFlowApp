@@ -75,7 +75,7 @@ public class ProfileBuilder {
                         tSign * speed * coeff * coeff * Math.sin(tSign * coeff * t + initialTheta),
                         -tSign * speed * coeff * coeff * Math.cos(tSign * coeff * t + finalTheta)
                 )
-        ), 0, Math.abs(diff) / speed);
+        ), 0, Math.abs(diff) / coeff);
 
         return new Arc(function, coeff, speed, diff, tSign, center);
     }

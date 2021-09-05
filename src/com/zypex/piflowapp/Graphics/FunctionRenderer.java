@@ -50,6 +50,8 @@ public class FunctionRenderer {
             try {
                 gc.moveTo((f.x.get(f.minT) - graphCenter.x) * xToCanvas, (f.y.get(f.minT) - graphCenter.y) * yToCanvas);
 
+                double lastDerivative = 0;
+
                 for (double t = f.minT; t <= f.maxT; ) {
                     final double tOfX = f.x.get(t);
                     final double tOfY = f.y.get(t);
@@ -58,10 +60,18 @@ public class FunctionRenderer {
                     final double tOfB = f.b.get(t);
                     final double tOfsize = f.size.get(t);
 
-                    final double h = derivativePrecision;
-                    final double xDerivative = (f.x.get(t + h) - tOfX) / h;
-                    final double yDerivative = (f.y.get(t + h) - tOfY) / h;
-                    final double pixelDistDerivative = Math.sqrt(Math.pow(xDerivative * xToCanvas, 2) + Math.pow(yDerivative * yToCanvas, 2));
+                    double pixelDistDerivative;
+
+                    try {
+                        final double h = derivativePrecision;
+                        final double xDerivative = (f.x.get(t + h) - tOfX) / h;
+                        final double yDerivative = (f.y.get(t + h) - tOfY) / h;
+                        pixelDistDerivative = Math.sqrt(Math.pow(xDerivative * xToCanvas, 2) + Math.pow(yDerivative * yToCanvas, 2));
+                        lastDerivative = pixelDistDerivative;
+                    }catch (InputOutOfDomainException e){
+                        pixelDistDerivative = lastDerivative;
+                    }
+
 
                     gc.beginPath();
 
