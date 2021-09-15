@@ -1,5 +1,7 @@
 package utils.math;
 
+import java.util.List;
+
 public interface BoundedFunction<T> extends Function<T> {
     double upperBound();
     double lowerBound();
@@ -11,5 +13,5 @@ public interface BoundedFunction<T> extends Function<T> {
         return get(lowerBound());
     }
 
-    BoundedFunction<T> offset(double offset);
+    BoundedFunction<T> offset(double offset) throws ClassCastException;
 }

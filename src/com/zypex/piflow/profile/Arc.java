@@ -6,7 +6,7 @@ import utils.math.Function;
 import utils.math.SingleBoundedFunction;
 import utils.math.Vector;
 
-public class Arc extends ProfileSegment {
+public class Arc extends SingleProfileSegment {
 
     public final Vector center;
     public final double radius;
@@ -44,7 +44,7 @@ public class Arc extends ProfileSegment {
 
     @Override
     public Arc offset(double offset) {
-        return new Arc((SingleBoundedFunction<Derivatives<Vector>>) function.offset(offset), coeff, speed, diff, dir, center);
+        return new Arc(function.offset(offset), coeff, speed, diff, dir, center);
     }
 
     @Override

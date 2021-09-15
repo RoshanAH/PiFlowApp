@@ -86,6 +86,10 @@ public class Vector implements Cloneable{
         return scale(dot(other) / square());
     }
 
+    public Vector dotInverse(){
+        return new Vector(1 / (2 * x), 1 / (2 * y));
+    }
+
     public Vector normalize(){
         return scale(1 / getMagnitude());
     }

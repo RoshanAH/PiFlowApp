@@ -33,7 +33,7 @@ public class Main extends Application {
     private final double initialHeight = 600;
     private final double initialWidth = 600;
 
-    private DrivetrainConfig config = new DrivetrainConfig(3, 2, 3);
+    private DrivetrainConfig config = new DrivetrainConfig(3, 5, 2);
 
     @Override
     public void start(Stage primaryStage) throws Exception {
@@ -89,7 +89,6 @@ public class Main extends Application {
     FunctionRenderer renderer = new FunctionRenderer(0, 0, 600, 600);
     BoundedFunction<Derivatives<Double>> profile = ProfileBuilder.CreateVelocityChange(0, 5, config);
     List<Vector> points = new ArrayList<>();
-    List<Vector> centers = new ArrayList<>();
     List<Arc> arcs = new ArrayList<>();
 
     public void init() {
@@ -100,6 +99,11 @@ public class Main extends Application {
         renderer.maxY = 15;
         renderer.resolution = 1;
 
+        linearInit();
+
+    }
+
+    private void interpolationInit(){
         points.add(new Vector(-5, -14));
         points.add(Vector.Polar(10, 0.1 * Math.PI).add(points.get(points.size() - 1)));
         points.add(Vector.Polar(10, 0.9 * Math.PI).add(points.get(points.size() - 1)));
@@ -133,90 +137,26 @@ public class Main extends Application {
                     .setColor(Color.GREEN)
             );
         }
-
-//        renderer.functions.add(new RenderedFunction(profile.lowerBound(), profile.upperBound())
-//                .attachX(t -> t)
-//                .attachY(t -> profile.get(t).position)
-//                .setSize(2)
-//                .setColor(Color.BLUE)
-//        );
-
-        centers = calcCenters();
-
-//        System.out.println(centers);
-
-    }
-
-    private List<Vector> calcCenters(){
-        List<Function<Vector>> axes = new ArrayList<>();
-
-        for(int i = 0; i < points.size() - 2; i++){
-            final Vector start = points.get(i);
-            final Vector middle = points.get(i + 1);
-            final Vector end = points.get(i + 2);
-            final Vector turnCenter = ProfileBuilder.FindTurnCenter(start, middle, end, config, config.maxVelocity);
-
-            if(i == 0) axes.add(t -> middle.subtract(start).normalize().scale(t).add(turnCenter));
-            else if (i == points.size() - 3) axes.add(t -> middle.subtract(end).normalize().scale(t).add(turnCenter));
-            else axes.add(t -> start.subtract(middle).normalize().add(end.subtract(middle).normalize()).normalize().scale(-t).add(turnCenter));
-        }
-
-        final double r = ProfileBuilder.FindTurningRadius(config, config.maxVelocity);
-
-        List<Vector> centers = new ArrayList<>();
-        {
-            final Vector initial = axes.get(0).get(0d);
-            final Vector slope = axes.get(0).get(1d).subtract(initial);
-
-            final Vector initial2 = axes.get(1).get(0d);
-            final Vector slope2 = axes.get(1).get(1d).subtract(initial2).scale(1d / (axes.size() - 1));
-
-            final double a = slope2.subtract(slope).square();
-            final double b = 2 * initial2.subtract(initial).dot(slope2.subtract(slope));
-            final double c = initial2.subtract(initial).square() - 4 * r * r;
-
-            final double t = (-b - Math.sqrt(b * b - 4 * a * c)) / (2 * a);
-
-            centers.add(initial.add(slope.scale(t)));
-            centers.add(initial2.add(slope2.scale(t)));
-
-//            System.out.println(initial.add(slope.scale(t)).subtract(initial2.add(slope2.scale(t))).getMagnitude() / r);
-        }
-
-        for(int i = 2; i < axes.size(); i++){
-            final Vector initial = axes.get(i).get(0d);
-            final Vector slope = axes.get(i).get(1d).subtract(initial);
-            final Vector last = centers.get(i - 1);
-
-            final double a = slope.square();
-            final double b = 2 * initial.subtract(last).dot(slope);
-            final double c = initial.subtract(last).square() - 4 * r * r;
-
-            final double determinate = Math.sqrt(b * b - 4 * a * c);
-            final double t1 = (-b - determinate) / (2 * a);
-            final double t2 = (-b + determinate) / (2 * a);
-
-            final Function<Vector> axis = axes.get(i);
-            final Vector center;
-
-            if(axis.get(t1).subtract(initial).getMagnitude() < axis.get(t2).subtract(initial).getMagnitude()){
-                center = axis.get(t1);
-            }else{
-                center = axis.get(t2);
-            }
-
-//            System.out.println(center.subtract(centers.get(centers.size() - 1)).getMagnitude() / r);
-            centers.add(center);
-        }
-
-        return centers;
     }
 
     private void onUpdate() {
-
         gc.clearRect(0, 0, gc.getCanvas().getWidth(), gc.getCanvas().getHeight());
         gc.setLineCap(StrokeLineCap.ROUND);
 
+        linear();
+
+
+    }
+
+    private void linearInit(){
+
+    }
+
+    private void linear(){
+
+    }
+
+    private void interpolation(){
         final Vector mousePos = renderer.toFrame(Mouse.position);
         final Vector closest = arcs.get(0).get(arcs.get(0).getT(mousePos)).position;
 
@@ -241,8 +181,6 @@ public class Main extends Application {
 
         }, gc);
         renderer.render(gc);
-
-//        System.out.println(mousePos);
 
     }
 

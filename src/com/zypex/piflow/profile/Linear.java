@@ -6,7 +6,7 @@ public class Linear extends ProfileSegment {
 
     public final SingleBoundedFunction<Derivatives<Vector>> function;
 
-//    For the format of (1/6)ax^3 + (1/2)bx^2 + cx + d
+//    For the format of ax^3 + bx^2 + cx + d
     public final double a;
     public final double b;
     public final double c;
@@ -14,7 +14,7 @@ public class Linear extends ProfileSegment {
     public final Vector dir;
 
 
-    public Linear(SingleBoundedFunction<Derivatives<Vector>> function, double length) {
+    Linear(SingleBoundedFunction<Derivatives<Vector>> function, double length) {
         super(function, length);
         this.function = function;
 
@@ -28,7 +28,34 @@ public class Linear extends ProfileSegment {
 
     @Override
     public double getT(Vector pos) {
-        return 0;
+
+        final Vector initial = function.get(0).position;
+        final double lower = function.getLower().position.subtract(initial).dot(dir.dotInverse());
+        final double upper = function.getUpper().position.subtract(initial).dot(dir.dotInverse());
+
+        final double rawT = dir.dot(pos.subtract(initial));
+        if (rawT <= lower) return lowerBound();
+        else if(rawT >= upper) return upperBound();
+        else return solve(rawT);
+    }
+
+//    Modified version of the newton's method
+    private double solve(double output){
+        final double initialGuess = (upperBound() + lowerBound()) / 2;
+
+        double lastGuess;
+        double guess = initialGuess;
+        double error = -1;
+        Function<Double> function = t -> a * t*t*t + b * t*t + c * t + d;
+        Function<Double> derivative = t -> 3 * a * t*t + 2 * b * t + c;
+
+        while(error < 0 || error > 1e-15){
+            lastGuess = guess;
+            guess = (output - function.get(guess)) / derivative.get(guess) + guess;
+            error = Math.abs(guess - lastGuess);
+        }
+
+        return guess;
     }
 
     @Override
@@ -42,7 +69,7 @@ public class Linear extends ProfileSegment {
     }
 
     @Override
-    public BoundedFunction<Derivatives<Vector>> offset(double offset) {
+    public Linear offset(double offset) {
         return new Linear(function.offset(offset), length);
     }
 }

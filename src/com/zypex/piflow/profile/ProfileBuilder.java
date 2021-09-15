@@ -5,7 +5,6 @@ import com.zypex.piflow.path.Path;
 import utils.math.*;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 public class ProfileBuilder {
@@ -21,9 +20,99 @@ public class ProfileBuilder {
 
     }
 
+    private static Linear CreateLinear(SingleBoundedFunction<Derivatives<Double>> profile, Vector start, Vector dir){
+        SingleBoundedFunction<Derivatives<Vector>> function = new SingleBoundedFunction<>(t -> new Derivatives<>(
+                start.add(dir.normalize().scale(profile.get(t).position)),
+                dir.normalize().scale(profile.get(t).velocity),
+                dir.normalize().scale(profile.get(t).acceleration),
+                dir.normalize().scale(profile.get(t).jerk)
+        ), profile.lowerBound(), profile.upperBound());
+
+        return new Linear(function, function.getUpper().position.subtract(function.getLower().position).getMagnitude());
+    }
+
     private static PiecewiseFunction<Derivatives<Double>> CreateDisplacement(Vector start, Vector end, double startSpeed, double endSpeed, double maxSpeed, DrivetrainConfig config) {
 
         return null;
+    }
+
+    public static PiecewiseFunction<Derivatives<Double>> CreateVelocityChange(double initialVel, double finalVel, DrivetrainConfig config) {
+        final double deltaVel = finalVel - initialVel;
+
+        final double maxAccel = Math.signum(deltaVel) * Math.sqrt(config.maxJerk * Math.abs(deltaVel));
+
+        if (Math.abs(maxAccel) <= config.maxAcceleration) {
+
+            final BoundedFunction<Derivatives<Double>> accelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
+                    config.maxJerk * Math.pow(t, 3) / 6 * Math.signum(deltaVel),
+                    initialVel + config.maxJerk * Math.pow(t, 2) / 2 * Math.signum(deltaVel), // Increasing position
+                    config.maxJerk * t * Math.signum(deltaVel), // Increasing vel
+                    config.maxJerk * Math.signum(deltaVel) // Increasing accel
+            ), 0, maxAccel / config.maxJerk);
+
+
+            final Derivatives<Double> endPoint1 = accelerate.getUpper();
+
+            final BoundedFunction<Derivatives<Double>> decelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
+                    endPoint1.position +
+                            endPoint1.velocity * t +
+                            endPoint1.acceleration * Math.pow(t, 2) / 2 +
+                            config.maxJerk * Math.pow(t, 3) / 6 * Math.signum(-deltaVel),
+
+                    endPoint1.velocity +
+                            endPoint1.acceleration * t +
+                            config.maxJerk * Math.pow(t, 2) / 2 * Math.signum(-deltaVel), // Increasing position
+
+                    endPoint1.acceleration +
+                            config.maxJerk * t * Math.signum(-deltaVel), // Decreasing vel
+
+                    config.maxJerk * Math.signum(-deltaVel) // Decreasing accel
+            ), 0, maxAccel / config.maxJerk);
+
+            return PiecewiseFunction.createAppended(accelerate, decelerate);
+        } else {
+
+            final BoundedFunction<Derivatives<Double>> accelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
+                    config.maxJerk * Math.pow(t, 3) / 6 * Math.signum(deltaVel),
+                    initialVel + config.maxJerk * Math.pow(t, 2) / 2 * Math.signum(deltaVel), // Increasing position
+                    config.maxJerk * t * Math.signum(deltaVel), // Increasing vel
+                    config.maxJerk * Math.signum(deltaVel) // Increasing accel
+            ), 0, config.maxAcceleration / config.maxJerk);
+
+            final Derivatives<Double> endPoint1 = accelerate.getUpper();
+
+            final BoundedFunction<Derivatives<Double>> maintain = new SingleBoundedFunction<>(t -> new Derivatives<>(
+                    endPoint1.position +
+                            endPoint1.velocity * t +
+                            config.maxAcceleration * Math.pow(t, 2) / 2 * Math.signum(deltaVel),
+
+                    endPoint1.velocity +
+                            config.maxAcceleration * t * Math.signum(deltaVel), // Increasing position
+
+                    config.maxAcceleration * Math.signum(deltaVel), // Increasing Vel
+                    0d // Constant accel
+            ), 0, deltaVel / config.maxAcceleration - config.maxAcceleration / config.maxJerk);
+
+            final Derivatives<Double> endPoint2 = maintain.getUpper();
+
+            final BoundedFunction<Derivatives<Double>> decelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
+                    endPoint2.position +
+                            endPoint2.velocity * t +
+                            endPoint2.acceleration * Math.pow(t, 2) / 2 +
+                            config.maxJerk * Math.pow(t, 3) / 6 * Math.signum(-deltaVel),
+
+                    endPoint2.velocity +
+                            endPoint2.acceleration * t +
+                            config.maxJerk * Math.pow(t, 2) / 2 * Math.signum(-deltaVel), // Increasing position
+
+                    endPoint2.acceleration +
+                            config.maxJerk * t * Math.signum(-deltaVel), // Decreasing vel
+
+                    config.maxJerk * Math.signum(-deltaVel) // Decreasing accel
+            ), 0, config.maxAcceleration / config.maxJerk);
+
+            return PiecewiseFunction.createAppended(accelerate, maintain, decelerate);
+        }
     }
 
     public static Arc CreateTurn(Vector start, Vector middle, Vector end, DrivetrainConfig config, double speed) {
@@ -100,7 +189,7 @@ public class ProfileBuilder {
             else slope = start.subtract(middle).normalize().add(end.subtract(middle).normalize()).normalize().scale(-1);
 
             if (i >= 1) {
-                ;
+
                 final Solution last = solutions.get(i - 1);
                 final Vector scaledSlope = last.slope.scale(1d / (i));
 
@@ -232,85 +321,6 @@ public class ProfileBuilder {
             return rawDiff;
         } else {
             return rawDiff - Math.signum(rawDiff) * 2 * Math.PI;
-        }
-    }
-
-    public static PiecewiseFunction<Derivatives<Double>> CreateVelocityChange(double initialVel, double finalVel, DrivetrainConfig config) {
-        final double deltaVel = finalVel - initialVel;
-
-        final double maxAccel = Math.signum(deltaVel) * Math.sqrt(config.maxJerk * Math.abs(deltaVel));
-
-        if (Math.abs(maxAccel) <= config.maxAcceleration) {
-
-            final BoundedFunction<Derivatives<Double>> accelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
-                    config.maxJerk * Math.pow(t, 3) / 6 * Math.signum(deltaVel),
-                    initialVel + config.maxJerk * Math.pow(t, 2) / 2 * Math.signum(deltaVel), // Increasing position
-                    config.maxJerk * t * Math.signum(deltaVel), // Increasing vel
-                    config.maxJerk * Math.signum(deltaVel) // Increasing accel
-            ), 0, maxAccel / config.maxJerk);
-
-
-            final Derivatives<Double> endPoint1 = accelerate.getUpper();
-
-            final BoundedFunction<Derivatives<Double>> decelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
-                    endPoint1.position +
-                            endPoint1.velocity * t +
-                            endPoint1.acceleration * Math.pow(t, 2) / 2 +
-                            config.maxJerk * Math.pow(t, 3) / 6 * Math.signum(-deltaVel),
-
-                    endPoint1.velocity +
-                            endPoint1.acceleration * t +
-                            config.maxJerk * Math.pow(t, 2) / 2 * Math.signum(-deltaVel), // Increasing position
-
-                    endPoint1.acceleration +
-                            config.maxJerk * t * Math.signum(-deltaVel), // Decreasing vel
-
-                    config.maxJerk * Math.signum(-deltaVel) // Decreasing accel
-            ), 0, maxAccel / config.maxJerk);
-
-            return PiecewiseFunction.createAppended(accelerate, decelerate);
-        } else {
-
-            final BoundedFunction<Derivatives<Double>> accelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
-                    config.maxJerk * Math.pow(t, 3) / 6 * Math.signum(deltaVel),
-                    initialVel + config.maxJerk * Math.pow(t, 2) / 2 * Math.signum(deltaVel), // Increasing position
-                    config.maxJerk * t * Math.signum(deltaVel), // Increasing vel
-                    config.maxJerk * Math.signum(deltaVel) // Increasing accel
-            ), 0, config.maxAcceleration / config.maxJerk);
-
-            final Derivatives<Double> endPoint1 = accelerate.getUpper();
-
-            final BoundedFunction<Derivatives<Double>> maintain = new SingleBoundedFunction<>(t -> new Derivatives<>(
-                    endPoint1.position +
-                            endPoint1.velocity * t +
-                            config.maxAcceleration * Math.pow(t, 2) / 2 * Math.signum(deltaVel),
-
-                    endPoint1.velocity +
-                            config.maxAcceleration * t * Math.signum(deltaVel), // Increasing position
-
-                    config.maxAcceleration * Math.signum(deltaVel), // Increasing Vel
-                    0d // Constant accel
-            ), 0, deltaVel / config.maxAcceleration - config.maxAcceleration / config.maxJerk);
-
-            final Derivatives<Double> endPoint2 = maintain.getUpper();
-
-            final BoundedFunction<Derivatives<Double>> decelerate = new SingleBoundedFunction<>(t -> new Derivatives<>(
-                    endPoint2.position +
-                            endPoint2.velocity * t +
-                            endPoint2.acceleration * Math.pow(t, 2) / 2 +
-                            config.maxJerk * Math.pow(t, 3) / 6 * Math.signum(-deltaVel),
-
-                    endPoint2.velocity +
-                            endPoint2.acceleration * t +
-                            config.maxJerk * Math.pow(t, 2) / 2 * Math.signum(-deltaVel), // Increasing position
-
-                    endPoint2.acceleration +
-                            config.maxJerk * t * Math.signum(-deltaVel), // Decreasing vel
-
-                    config.maxJerk * Math.signum(-deltaVel) // Decreasing accel
-            ), 0, config.maxAcceleration / config.maxJerk);
-
-            return PiecewiseFunction.createAppended(accelerate, maintain, decelerate);
         }
     }
 

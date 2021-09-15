@@ -72,7 +72,6 @@ public class FunctionRenderer {
                         pixelDistDerivative = lastDerivative;
                     }
 
-
                     gc.beginPath();
 
                     if (tOfX >= minX && tOfX <= maxX && tOfY >= minY && tOfY <= maxY) {
