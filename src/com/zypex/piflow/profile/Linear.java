@@ -2,21 +2,19 @@ package com.zypex.piflow.profile;
 
 import utils.math.*;
 
-public class Linear extends ProfileSegment {
+public class Linear extends SingleProfileSegment {
 
-    public final SingleBoundedFunction<Derivatives<Vector>> function;
 
 //    For the format of ax^3 + bx^2 + cx + d
-    public final double a;
-    public final double b;
-    public final double c;
-    public final double d;
-    public final Vector dir;
+    private final double a;
+    private final double b;
+    private final double c;
+    private final double d;
+    private final Vector dir;
 
 
     Linear(SingleBoundedFunction<Derivatives<Vector>> function, double length) {
         super(function, length);
-        this.function = function;
 
         this.d = function.get(0).position.getMagnitude();
         this.c = function.get(0).velocity.getMagnitude();
@@ -24,6 +22,10 @@ public class Linear extends ProfileSegment {
         this.a = function.get(0).jerk.getMagnitude();
 
         this.dir = function.get(upperBound()).position.subtract(function.get(lowerBound()).position).normalize();
+    }
+
+    Linear(SingleBoundedFunction<Derivatives<Vector>> function) {
+        this(function, function.getUpper().position.subtract(function.getLower().position).getMagnitude());
     }
 
     @Override
@@ -46,6 +48,9 @@ public class Linear extends ProfileSegment {
         double lastGuess;
         double guess = initialGuess;
         double error = -1;
+
+
+
         Function<Double> function = t -> a * t*t*t + b * t*t + c * t + d;
         Function<Double> derivative = t -> 3 * a * t*t + 2 * b * t + c;
 
@@ -56,6 +61,11 @@ public class Linear extends ProfileSegment {
         }
 
         return guess;
+    }
+
+    @Override
+    public Derivatives<Vector> get(double input) {
+        return function.get(input);
     }
 
     @Override
@@ -70,6 +80,6 @@ public class Linear extends ProfileSegment {
 
     @Override
     public Linear offset(double offset) {
-        return new Linear(function.offset(offset), length);
+        return new Linear(function.offset(offset));
     }
 }

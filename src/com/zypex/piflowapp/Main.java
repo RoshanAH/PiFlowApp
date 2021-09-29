@@ -3,6 +3,7 @@ package com.zypex.piflowapp;
 import com.zypex.piflow.DrivetrainConfig;
 import com.zypex.piflow.profile.Arc;
 import com.zypex.piflow.profile.Derivatives;
+import com.zypex.piflow.profile.Linear;
 import com.zypex.piflow.profile.ProfileBuilder;
 import com.zypex.piflowapp.Graphics.FunctionRenderer;
 import com.zypex.piflowapp.Graphics.RenderedFunction;
@@ -151,6 +152,8 @@ public class Main extends Application {
     private void linearInit(){
 
     }
+
+    Linear linearProfile = ProfileBuilder.
 
     private void linear(){
 
