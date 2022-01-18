@@ -1,7 +1,7 @@
 package com.zypex.piflowapp
 
 import javafx.scene.canvas.GraphicsContext
-import com.zypex.piflow.DrivetrainConfig
+import com.zypex.piflow.DriveConfig
 import com.zypex.piflow.profile.Arc
 import javafx.animation.Timeline
 import javafx.animation.KeyFrame
@@ -11,11 +11,9 @@ import javafx.scene.Scene
 import com.zypex.piflowapp.Graphics.FunctionRenderer
 import utils.math.BoundedFunction
 import com.zypex.piflow.profile.Derivatives
-import com.zypex.piflow.profile.ProfileBuilder
 import com.zypex.piflowapp.Graphics.RenderedFunction
 import javafx.scene.shape.StrokeLineCap
 import javafx.application.Application
-import javafx.event.ActionEvent
 import javafx.event.EventHandler
 import javafx.scene.Group
 import javafx.scene.canvas.Canvas
@@ -30,7 +28,7 @@ class Main : Application() {
     private var gc: GraphicsContext? = null
     private val initialHeight = 600.0
     private val initialWidth = 600.0
-    private val config = DrivetrainConfig(3.0, 5.0, 2.0)
+    private val config = DriveConfig(3.0, 5.0, 2.0)
 
     override fun start(primaryStage: Stage) {
         primaryStage.title = "wait does this actually work?"
@@ -70,7 +68,7 @@ class Main : Application() {
     }
 
     private var renderer = FunctionRenderer(0.0, 0.0, 600.0, 600.0)
-    private var profile: BoundedFunction<Derivatives<Double>> = ProfileBuilder.createVelocityChange(0.0, 5.0, config)
+    private var profile: BoundedFunction<Derivatives<Double>> = createVelocityChange(0.0, 5.0, config)
     private var points: MutableList<Vector> = ArrayList()
     var arcs: List<Arc> = ArrayList()
     override fun init() {
@@ -98,7 +96,7 @@ class Main : Application() {
             val start = points[i - 1]
             val middle = points[i]
             val end = points[i + 1]
-            val turn = ProfileBuilder.createTurn(start, middle, end, config, config.maxVelocity)
+            val turn = createTurn(start, middle, end, config, config.maxVelocity)
             //            renderer.functions.add(new RenderedFunction(turn.lowerBound, turn.upperBound)
 //                    .attachX(t -> turn.get(t).position.x)
 //                    .attachY(t -> turn.get(t).position.y)
@@ -106,7 +104,7 @@ class Main : Application() {
 //                    .setSize(2)
 //            );
         }
-        arcs = ProfileBuilder.createInterpolation(points, config, config.maxVelocity)
+        arcs = createInterpolation(points, config, config.maxVelocity)
         for (arc in arcs) {
             renderer.functions.add(RenderedFunction(arc.lowerBound(), arc.upperBound())
                 .attachX { t: Double -> arc(t).position.x }

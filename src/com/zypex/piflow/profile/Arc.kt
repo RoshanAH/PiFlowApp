@@ -2,7 +2,6 @@ package com.zypex.piflow.profile
 
 import utils.math.*
 import kotlin.math.abs
-import com.zypex.piflow.profile.ProfileBuilder;
 
 typealias SingleProfile = SingleBoundedFunction<Derivatives<Vector>>
 
@@ -35,8 +34,8 @@ class Arc(function: SingleProfile, coeff: Double, speed: Double, diff: Double, d
         theta = if (angleDiff(direction.theta, iTheta) + angleDiff(fTheta, direction.theta) == angleDiff(fTheta, iTheta)) {
             direction.theta
         } else {
-            val initialDifference: Double = abs(ProfileBuilder.findAngleDifference(direction.theta, iTheta))
-            val finalDifference: Double = abs(ProfileBuilder.findAngleDifference(fTheta, direction.theta))
+            val initialDifference: Double = abs(findAngleDifference(direction.theta, iTheta))
+            val finalDifference: Double = abs(findAngleDifference(fTheta, direction.theta))
             if (initialDifference < finalDifference) iTheta else fTheta
         }
 
