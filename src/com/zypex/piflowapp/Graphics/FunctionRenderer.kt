@@ -15,6 +15,7 @@ class FunctionRenderer(var canvasX: Double, var canvasY: Double, var canvasW: Do
     var maxX = 0.0
     var minY = 0.0
     var maxY = 0.0
+
     fun render(gc: GraphicsContext) {
         gc.save()
         gc.translate(canvasX + canvasW / 2, canvasY + canvasH / 2)

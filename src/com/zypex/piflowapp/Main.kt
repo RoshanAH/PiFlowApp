@@ -1,34 +1,33 @@
 package com.zypex.piflowapp
 
-import javafx.scene.canvas.GraphicsContext
 import com.zypex.piflow.DriveConfig
-import com.zypex.piflow.profile.Arc
-import javafx.animation.Timeline
-import javafx.animation.KeyFrame
-import com.zypex.piflowapp.Input.Mouse
-import javafx.scene.input.MouseButton
-import javafx.scene.Scene
+import com.zypex.piflow.profile.*
 import com.zypex.piflowapp.Graphics.FunctionRenderer
-import utils.math.BoundedFunction
-import com.zypex.piflow.profile.Derivatives
 import com.zypex.piflowapp.Graphics.RenderedFunction
-import javafx.scene.shape.StrokeLineCap
+import com.zypex.piflowapp.Input.Mouse
+import javafx.animation.KeyFrame
+import javafx.animation.Timeline
 import javafx.application.Application
 import javafx.event.EventHandler
 import javafx.scene.Group
+import javafx.scene.Scene
 import javafx.scene.canvas.Canvas
+import javafx.scene.canvas.GraphicsContext
+import javafx.scene.input.MouseButton
 import javafx.scene.input.MouseEvent
 import javafx.scene.paint.Color
+import javafx.scene.shape.StrokeLineCap
 import javafx.stage.Stage
 import javafx.util.Duration
+import utils.math.BoundedFunction
 import utils.math.Vector
-import kotlin.collections.ArrayList
+import kotlin.math.abs
 
 class Main : Application() {
     private var gc: GraphicsContext? = null
     private val initialHeight = 600.0
     private val initialWidth = 600.0
-    private val config = DriveConfig(3.0, 5.0, 2.0)
+    private val config = DriveConfig(10.0, 3.0, 3.0)
 
     override fun start(primaryStage: Stage) {
         primaryStage.title = "wait does this actually work?"
@@ -68,7 +67,7 @@ class Main : Application() {
     }
 
     private var renderer = FunctionRenderer(0.0, 0.0, 600.0, 600.0)
-    private var profile: BoundedFunction<Derivatives<Double>> = createVelocityChange(0.0, 5.0, config)
+    private var profile: BoundedFunction<Derivatives<Double>> = createVelocityChange(5.0, 0.0, config)
     private var points: MutableList<Vector> = ArrayList()
     var arcs: List<Arc> = ArrayList()
     override fun init() {
@@ -123,10 +122,54 @@ class Main : Application() {
                 linear()
     }
 
-    private fun linearInit() {}
+    private fun linearInit() {
+
+        val start = System.nanoTime()
+        profile = createDisplacement(10.0, 5.0, 0.0, 6.0, config)
+        val end = System.nanoTime()
+
+        println("Profile generation finished in " + ((end - start) / 1.0e6) + " milliseconds")
+
+        renderer.functions.add(RenderedFunction(profile.lowerBound(), profile.upperBound())
+            .attachX { it }
+            .attachY { profile(it).velocity }
+//            .attachG { (profile(it).jerk / 2).coerceIn(0.0..1.0)}
+//            .attachR { (-profile(it).jerk / 2).coerceIn(0.0..1.0)}
+//            .attachSize { (abs(profile(it).acceleration)).coerceIn(1.0..5.0) }
+            .setColor(Color.BLACK)
+            .setSize(3.0)
+        )
+
+        renderer.functions.add(RenderedFunction(profile.lowerBound(), profile.upperBound())
+            .attachX { it }
+            .attachY { profile(it).acceleration }
+            .setColor(Color.RED)
+            .setSize(3.0)
+        )
+
+        renderer.functions.add(RenderedFunction(profile.lowerBound(), profile.upperBound())
+            .attachX { it }
+            .attachY { profile(it).jerk }
+            .setColor(Color.BLUE)
+            .setSize(3.0)
+        )
+
+//        renderer.functions.add(RenderedFunction(profile.lowerBound(), profile.upperBound())
+//            .attachX { it }
+//            .attachY { profile(it).position }
+//            .setColor(Color.GREEN)
+//            .setSize(3.0)
+//        )
+    }
 
     //    Linear linearProfile = ProfileBuilder.
-    private fun linear() {}
+    private fun linear() {
+        val gc : GraphicsContext = gc ?: return
+
+        renderer.render(gc)
+
+
+    }
     private fun interpolation() {
         val gc: GraphicsContext = gc ?: return
 
