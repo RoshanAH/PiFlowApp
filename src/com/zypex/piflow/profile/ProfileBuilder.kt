@@ -48,7 +48,7 @@ fun createLinear(profile: SingleBoundedFunction<Derivatives<Double>>, start: Vec
     return Linear(function)
 }
 
-fun createDisplacement( // TODO position does not compound off of previous segments
+fun createDisplacement(
     dist: Double,
     initialSpeed: Double,
     finalSpeed: Double,

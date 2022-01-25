@@ -9,7 +9,6 @@ class Arc(function: SingleProfile, coeff: Double, speed: Double, diff: Double, d
     val radius: Double
     val dir: Int
 
-    //   TODO: Change these back to public
     private val coeff: Double
     private val speed: Double
     val diff: Double
