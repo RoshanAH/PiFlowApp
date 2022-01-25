@@ -20,14 +20,15 @@ import javafx.scene.shape.StrokeLineCap
 import javafx.stage.Stage
 import javafx.util.Duration
 import utils.math.BoundedFunction
+import utils.math.SingleBoundedFunction
 import utils.math.Vector
-import kotlin.math.abs
+import kotlin.math.pow
 
 class Main : Application() {
     private var gc: GraphicsContext? = null
     private val initialHeight = 600.0
     private val initialWidth = 600.0
-    private val config = DriveConfig(10.0, 3.0, 3.0)
+    private val config = DriveConfig(1.0, 10.0, 1.0)
 
     override fun start(primaryStage: Stage) {
         primaryStage.title = "wait does this actually work?"
@@ -67,13 +68,19 @@ class Main : Application() {
     }
 
     private var renderer = FunctionRenderer(0.0, 0.0, 600.0, 600.0)
-    private var profile: BoundedFunction<Derivatives<Double>> = createVelocityChange(5.0, 0.0, config)
+    private var profile: BoundedFunction<Derivatives<Double>> =
+        SingleBoundedFunction({ Derivatives(0.0, 0.0, 0.0, 0.0) }, 0.0, 0.0)
     private var points: MutableList<Vector> = ArrayList()
+    private var startTime: Double = System.nanoTime() / 1.0e9 + 3.0
+    private var runTime: Double = 0.0
+
     var arcs: List<Arc> = ArrayList()
+
+
     override fun init() {
-        renderer.minX = -15.0
-        renderer.maxX = 15.0
-        renderer.minY = -15.0
+        renderer.minX = -1.0
+        renderer.maxX = 14.0
+        renderer.minY = -5.0
         renderer.maxY = 15.0
         renderer.resolution = 1.0
 
@@ -118,14 +125,20 @@ class Main : Application() {
         val gc: GraphicsContext = gc ?: return
         gc.clearRect(0.0, 0.0, gc.canvas.width, gc.canvas.height)
         gc.lineCap = StrokeLineCap.ROUND
+
+        runTime = System.nanoTime() / 1.0e9 - startTime
+
+
 //        interpolation()
-                linear()
+        linear()
     }
 
     private fun linearInit() {
 
+        val displacement = 10.0
+
         val start = System.nanoTime()
-        profile = createDisplacement(10.0, 5.0, 0.0, 6.0, config)
+        profile = createDisplacement(displacement, 0.0, 0.0, 50.0, config)
         val end = System.nanoTime()
 
         println("Profile generation finished in " + ((end - start) / 1.0e6) + " milliseconds")
@@ -154,22 +167,37 @@ class Main : Application() {
             .setSize(3.0)
         )
 
-//        renderer.functions.add(RenderedFunction(profile.lowerBound(), profile.upperBound())
-//            .attachX { it }
-//            .attachY { profile(it).position }
-//            .setColor(Color.GREEN)
-//            .setSize(3.0)
-//        )
+        renderer.functions.add(RenderedFunction(profile.lowerBound(), profile.upperBound())
+            .attachX { it }
+            .attachY { profile(it).position }
+            .setColor(Color.GREEN)
+            .setSize(3.0)
+        )
+
+        renderer.functions.add(RenderedFunction(profile.lowerBound(), profile.upperBound())
+            .attachX { it }
+            .setY(displacement)
+            .setColor(Color.GREY)
+            .setSize(3.0)
+        )
     }
 
     //    Linear linearProfile = ProfileBuilder.
     private fun linear() {
-        val gc : GraphicsContext = gc ?: return
+        val gc: GraphicsContext = gc ?: return
 
         renderer.render(gc)
 
+        gc.fill = Color.BLUE
+
+
+        renderer.renderInFrame({
+            gc.fillRect(14.5, 0.5 + profile.bounded(runTime).position, 0.5, 0.5)
+        }, gc)
+
 
     }
+
     private fun interpolation() {
         val gc: GraphicsContext = gc ?: return
 
