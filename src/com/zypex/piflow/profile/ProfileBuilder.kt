@@ -66,25 +66,24 @@ fun createDisplacement( // TODO position does not compound off of previous segme
 
     if (maxIntermediate < dist) {
         val speedUp = createVelocityChange(initialSpeed, finalMaxSpeed, config)
-        val slowDown = createVelocityChange(finalMaxSpeed, finalSpeed, config)
-        val makeUpDist = dist - (speedUp.upper.position + slowDown.upper.position)
+        val relativeSlowDown = createVelocityChange(finalMaxSpeed, finalSpeed, config)
+        val makeUpDist = dist - (speedUp.upper.position + relativeSlowDown.upper.position)
 
         val maintain =
             SingleBoundedFunction(
                 {
                     Derivatives(
-                        finalMaxSpeed * it, finalMaxSpeed, 0.0, 0.0
+                        finalMaxSpeed * it + speedUp.upper.position, finalMaxSpeed, 0.0, 0.0
                     )
                 }, 0.0, makeUpDist / finalMaxSpeed
             )
 
         out.appendFunction(speedUp)
         out.appendFunction(maintain)
-        out.appendFunction(slowDown)
+        out.appendFunction(createVelocityChange(finalMaxSpeed, finalSpeed, config, maintain.upper.position))
     } else {
-
         val intermediateSpeed: Double
-        val maxChange = config.maxAcceleration.pow(2) / config.maxJerk
+        val maxChange = 2 * config.maxAcceleration.pow(2) / config.maxJerk
         val lowestSpeed = min(abs(initialSpeed), abs(finalSpeed))
         val highestSpeed = max(abs(initialSpeed), abs(finalSpeed))
 
@@ -92,11 +91,8 @@ fun createDisplacement( // TODO position does not compound off of previous segme
 
 //        This is the max amount of distance that could be traveled with acceleration never constant
         val doubleAccelDisplacement =
-            createVelocityChange(lowestSpeed, lowestSpeed + maxChange, config).upper.position + createVelocityChange(
-                lowestSpeed + maxChange,
-                highestSpeed,
-                config
-            ).upper.position
+            createVelocityChange(lowestSpeed, lowestSpeed + maxChange, config).upper.position +
+                    createVelocityChange(lowestSpeed + maxChange, highestSpeed, config).upper.position
 //        This is the max amount of distance that could be traveled with acceleration never constant at only one side of the curve
         val singleAccelDisplacement =
             createVelocityChange(lowestSpeed, highestSpeed + maxChange, config).upper.position + createVelocityChange(
@@ -107,34 +103,31 @@ fun createDisplacement( // TODO position does not compound off of previous segme
 
         if (dist < minDisplacement) {
             throw ProfileOverconstrainedException("Distance $dist is too small to change from velocities $initialSpeed to $finalSpeed. Distance must either be $minDisplacement or the change in velocity must be lower") // TODO actually solve for the change in velocity here
-        } else if (dist < doubleAccelDisplacement) {
+        } else if (dist < doubleAccelDisplacement && lowestSpeed + maxChange > highestSpeed) {
             intermediateSpeed = newtonMethodSolve(
                 dist, SingleBoundedFunction({
-                    createVelocityChange(initialSpeed, it, config).upper.position + createVelocityChange(
-                        it, finalSpeed, config
-                    ).upper.position
-                }, abs(finalSpeed - initialSpeed), lowestSpeed + maxChange)
+                    createVelocityChange(initialSpeed, it, config).upper.position +
+                            createVelocityChange(it, finalSpeed, config).upper.position
+                }, highestSpeed - lowestSpeed, lowestSpeed + maxChange)
             )
         } else if (dist < singleAccelDisplacement) {
             intermediateSpeed = newtonMethodSolve(
                 dist, SingleBoundedFunction({
-                    createVelocityChange(initialSpeed, it, config).upper.position + createVelocityChange(
-                        it, finalSpeed, config
-                    ).upper.position
+                    createVelocityChange(initialSpeed, it, config).upper.position +
+                            createVelocityChange(it, finalSpeed, config).upper.position
                 }, lowestSpeed + maxChange, highestSpeed + maxChange)
             )
         } else {
             intermediateSpeed = newtonMethodSolve(
                 dist, SingleBoundedFunction({
-                    createVelocityChange(initialSpeed, it, config).upper.position + createVelocityChange(
-                        it, finalSpeed, config
-                    ).upper.position
+                    createVelocityChange(initialSpeed, it, config).upper.position +
+                            createVelocityChange(it, finalSpeed, config).upper.position
                 }, highestSpeed + maxChange, config.maxVelocity)
             )
         }
 
         val speedUp = createVelocityChange(initialSpeed, intermediateSpeed, config)
-        val slowDown = createVelocityChange(intermediateSpeed, finalSpeed, config)
+        val slowDown = createVelocityChange(intermediateSpeed, finalSpeed, config, speedUp.upper.position)
         out.appendFunction(speedUp)
         out.appendFunction(slowDown)
     }
@@ -144,10 +137,11 @@ fun createDisplacement( // TODO position does not compound off of previous segme
 fun createDisplacement(
     start: Vector, end: Vector, initialSpeed: Double, finalSpeed: Double, maxSpeed: Double, config: MotionConstraints
 ): CompoundProfileSegment {
-    TODO() /* Call the overloaded function, break it down, and reattach it along the line*/ }
+    TODO() /* Call the overloaded function, break it down, and reattach it along the line*/
+}
 
 fun createVelocityChange(
-    initialVel: Double, finalVel: Double, config: MotionConstraints
+    initialVel: Double, finalVel: Double, config: MotionConstraints, initialPos: Double = 0.0
 ): PiecewiseFunction<Derivatives<Double>> {
 
     val deltaVel = finalVel - initialVel
@@ -155,20 +149,33 @@ fun createVelocityChange(
     return if (abs(maxAccel) <= config.maxAcceleration) {
         val accelerate: BoundedFunction<Derivatives<Double>> = SingleBoundedFunction({
             Derivatives(
-                config.maxJerk * Math.pow(it, 3.0) / 6 * sign(deltaVel),
-                initialVel + config.maxJerk * it.pow(2.0) / 2 * sign(deltaVel),  // Increasing position
-                config.maxJerk * it * sign(deltaVel),  // Increasing vel
+                initialPos +
+                        initialVel * it +
+                        config.maxJerk * it.pow(3.0) / 6 * sign(deltaVel),
+
+                initialVel +
+                        config.maxJerk * it.pow(2.0) / 2 * sign(deltaVel),  // Increasing position
+
+                config.maxJerk * it * sign(deltaVel), // Increasing vel
+
                 config.maxJerk * sign(deltaVel) // Increasing accel
             )
         }, 0.0, abs(maxAccel) / config.maxJerk)
         val endPoint1 = accelerate.upper
         val decelerate: BoundedFunction<Derivatives<Double>> = SingleBoundedFunction({
             Derivatives(
-                endPoint1.position + endPoint1.velocity * it + endPoint1.acceleration * it.pow(2.0) / 2 + config.maxJerk * it.pow(
-                    3.0
-                ) / 6 * sign(-deltaVel),
-                endPoint1.velocity + endPoint1.acceleration * it + config.maxJerk * it.pow(2.0) / 2 * sign(-deltaVel),  // Increasing position
-                endPoint1.acceleration + config.maxJerk * it * sign(-deltaVel),  // Decreasing vel
+                endPoint1.position +
+                        endPoint1.velocity * it +
+                        endPoint1.acceleration * it.pow(2.0) / 2 +
+                        config.maxJerk * it.pow(3.0) / 6 * sign(-deltaVel),
+
+                endPoint1.velocity +
+                        endPoint1.acceleration * it +
+                        config.maxJerk * it.pow(2.0) / 2 * sign(-deltaVel),  // Increasing position
+
+                endPoint1.acceleration +
+                        config.maxJerk * it * sign(-deltaVel),  // Decreasing vel
+
                 config.maxJerk * sign(-deltaVel) // Decreasing accel
             )
         }, 0.0, abs(maxAccel) / config.maxJerk)
@@ -176,17 +183,27 @@ fun createVelocityChange(
     } else {
         val accelerate: BoundedFunction<Derivatives<Double>> = SingleBoundedFunction({
             Derivatives(
-                config.maxJerk * Math.pow(it, 3.0) / 6 * Math.signum(deltaVel),
-                initialVel + config.maxJerk * Math.pow(it, 2.0) / 2 * Math.signum(deltaVel),  // Increasing position
-                config.maxJerk * it * Math.signum(deltaVel),  // Increasing vel
-                config.maxJerk * Math.signum(deltaVel) // Increasing accel
+                initialPos + initialVel * it +
+                        config.maxJerk * it.pow(3.0) / 6 * sign(deltaVel),
+
+                initialVel +
+                        config.maxJerk * it.pow(2.0) / 2 * sign(deltaVel),  // Increasing position
+
+                config.maxJerk * it * sign(deltaVel),  // Increasing vel
+
+                config.maxJerk * sign(deltaVel) // Increasing accel
             )
         }, 0.0, config.maxAcceleration / config.maxJerk)
         val endPoint1 = accelerate.upper
         val maintain: BoundedFunction<Derivatives<Double>> = SingleBoundedFunction({
             Derivatives(
-                endPoint1.position + endPoint1.velocity * it + config.maxAcceleration * it.pow(2.0) / 2 * sign(deltaVel),
-                endPoint1.velocity + config.maxAcceleration * it * sign(deltaVel),  // Increasing position
+                endPoint1.position +
+                        endPoint1.velocity * it +
+                        config.maxAcceleration * it.pow(2.0) / 2 * sign(deltaVel),
+
+                endPoint1.velocity +
+                        config.maxAcceleration * it * sign(deltaVel),  // Increasing position
+
                 config.maxAcceleration * sign(deltaVel),  // Increasing Vel
                 0.0 // Constant accel
             )
@@ -194,11 +211,18 @@ fun createVelocityChange(
         val endPoint2 = maintain.upper
         val decelerate: BoundedFunction<Derivatives<Double>> = SingleBoundedFunction({
             Derivatives(
-                endPoint2.position + endPoint2.velocity * it + endPoint2.acceleration * it.pow(2.0) / 2 + config.maxJerk * it.pow(
-                    3.0
-                ) / 6 * sign(-deltaVel),
-                endPoint2.velocity + endPoint2.acceleration * it + config.maxJerk * it.pow(2.0) / 2 * sign(-deltaVel),  // Increasing position
-                endPoint2.acceleration + config.maxJerk * it * sign(-deltaVel),  // Decreasing vel
+                endPoint2.position +
+                        endPoint2.velocity * it +
+                        endPoint2.acceleration * it.pow(2.0) / 2 +
+                        config.maxJerk * it.pow(3.0) / 6 * sign(-deltaVel),
+
+                endPoint2.velocity +
+                        endPoint2.acceleration * it +
+                        config.maxJerk * it.pow(2.0) / 2 * sign(-deltaVel),  // Increasing position
+
+                endPoint2.acceleration +
+                        config.maxJerk * it * sign(-deltaVel),  // Decreasing vel
+
                 config.maxJerk * sign(-deltaVel) // Decreasing accel
             )
         }, 0.0, config.maxAcceleration / config.maxJerk)
@@ -227,7 +251,8 @@ private fun createArc(
     val iMod = (initialTheta % pi2 + pi2) % pi2
     val fMod = (finalTheta % pi2 + pi2) % pi2
     val diff = (tSign * (fMod - iMod) % pi2 + pi2) % pi2
-    val coeff = if (config.maxJerk < config.maxAcceleration) sqrt(config.maxJerk / speed) else config.maxAcceleration / speed
+    val coeff =
+        if (config.maxJerk < config.maxAcceleration) sqrt(config.maxJerk / speed) else config.maxAcceleration / speed
 
     val function = SingleBoundedFunction({
         Derivatives(
@@ -387,18 +412,23 @@ fun newtonMethodSolve(
 }
 
 fun newtonMethodSolve(
-    output: Double, function: BoundedFunction<Double>, precision: Double = 1e-13
+    output: Double, function: BoundedFunction<Double>, precision: Double = 1e-14, dx: Double = 1e-14
 ): Double {
     val initialGuess = (function.upperBound() + function.lowerBound()) / 2
-    var lastGuess: Double
     var guess = initialGuess
     var error = -1.0
 
+
     while (error < 0 || error > precision) {
-        lastGuess = guess
-        val derivative = (min(function(guess + 1e-14), function.upperBound()) - max(function(guess - 1e-14), function.lowerBound())) / 2e-14
-        guess += (output - function(guess)) / derivative
-        error = abs(guess - lastGuess)
+        val out = function(guess)
+
+        // dx is scaled by the output of the function in order to compensate for double rounding
+        val derivative = (function.bounded(guess + dx / 2 * out) - function.bounded(guess - dx / 2 * out)) / (dx * out)
+        val delta = (output - out) / derivative
+
+        guess += delta
+        guess = guess.coerceIn(function.lowerBound()..function.upperBound())
+        error = abs(output - out)
     }
     return guess
 }
