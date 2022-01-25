@@ -9,5 +9,7 @@ interface BoundedFunction<T> : (Double) -> T {
     val lower: T
         get() = this(lowerBound())
 
+    fun bounded(input: Double) : T = this(input.coerceIn(lowerBound()..upperBound()))
+
     fun offset(offset: Double): BoundedFunction<T>
 }
