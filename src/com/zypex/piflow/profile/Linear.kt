@@ -1,7 +1,7 @@
 package com.zypex.piflow.profile
 
 import utils.math.*
-import kotlin.math.abs
+import kotlin.math.*
 
 class Linear @JvmOverloads internal constructor(function: SingleBoundedFunction<Derivatives<Vector>>, length: Double = function.upper.position.subtract(function.lower.position).magnitude) : SingleProfileSegment(function, length) {
     //    For the format of ax^3 + bx^2 + cx + d
@@ -12,10 +12,10 @@ class Linear @JvmOverloads internal constructor(function: SingleBoundedFunction<
     private val dir: Vector
 
     init {
-        d = function(0.0).position.magnitude
-        c = function(0.0).velocity.magnitude
-        b = function(0.0).acceleration.magnitude
-        a = function(0.0).jerk.magnitude
+        d = function.lower.position.magnitude
+        c = function.lower.velocity.magnitude
+        b = function.lower.acceleration.magnitude / 2.0
+        a = function.lower.jerk.magnitude / 6.0
         dir = function.upper.position.subtract(function.lower.position).normalize()
     }
 
@@ -30,15 +30,14 @@ class Linear @JvmOverloads internal constructor(function: SingleBoundedFunction<
     //    Modified version of the newton's method
     private fun solve(output: Double): Double {
         val initialGuess = (upperBound() + lowerBound()) / 2
-        var lastGuess: Double
         var guess = initialGuess
         var error = -1.0
-        val function: (Double) -> Double = {a * it * it * it + b * it * it + c * it + d }
+        val function: (Double) -> Double = {a * it.pow(3.0) + b * it.pow(2.0) + c * it + d }
         val derivative: (Double) -> Double = {3 * a * it * it + 2 * b * it + c }
-        while (error < 0 || error > 1e-15) {
-            lastGuess = guess
-            guess += (output - function(guess)) / derivative(guess)
-            error = abs(guess - lastGuess)
+        while (error < 0 || error > 1e-14) {
+            val out = function(guess)
+            guess += (output - out) / derivative(guess)
+            error = abs(out - guess)
         }
         return guess
     }
