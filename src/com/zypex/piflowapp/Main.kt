@@ -37,7 +37,7 @@ class Main : Application() {
         gc = canvas.graphicsContext2D
         val mainLoop = Timeline()
         mainLoop.cycleCount = Timeline.INDEFINITE
-        val kf = KeyFrame(Duration.seconds(1.0 / 60), { onUpdate() })
+        val kf = KeyFrame(Duration.seconds(1.0 / 60), { gc ?: onUpdate() })
 
         canvas.onMousePressed = EventHandler {
             if (it.isPrimaryButtonDown) Mouse.leftButton = true
