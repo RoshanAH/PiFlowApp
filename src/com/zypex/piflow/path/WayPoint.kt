@@ -2,11 +2,23 @@ package com.zypex.piflow.path
 
 import utils.math.Vector
 
-class WayPoint(x: Double, y: Double) : PathElement {
+class WayPoint() : PathElement {
     var speed: Double? = null
     var heading: Double? = null
     var rotation: Double? = null
-    var position: Vector? = null
+    var velocity: Vector? = null
 
-    constructor(pos: Vector) : this(pos.x, pos.y)
+    private var _t: Double? = null
+    var t: Double?
+        get() = _t
+        internal set(d){
+            _t = d
+        }
+
+    val initialized: Boolean
+        get() = t == null
+
+    var isStopPoint: Boolean = false
+
+
 }
