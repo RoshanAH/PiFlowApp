@@ -396,23 +396,43 @@ fun quadraticSolve(a: Double, b: Double, c: Double): Pair<Double, Double> {
 }
 
 fun newtonMethodSolve(
-    output: Double, function: BoundedFunction<Double>, derivative: BoundedFunction<Double>, precision: Double = 1e-13
+    output: Double,
+    function: (Double) -> Double,
+    derivative: (Double) -> Double,
+    lowerBound: Double,
+    upperBound: Double,
+    precision: Double = 1e-13
+): Double =
+    newtonMethodSolve(
+        output,
+        SingleBoundedFunction(function, lowerBound, upperBound),
+        SingleBoundedFunction(derivative, lowerBound, upperBound),
+        precision
+    )
+
+fun newtonMethodSolve(
+    output: Double,
+    function: BoundedFunction<Double>,
+    derivative: BoundedFunction<Double>,
+    precision: Double = 1e-13
 ): Double {
 
     val initialGuess = (function.upperBound() + function.lowerBound()) / 2
-    var lastGuess: Double
     var guess = initialGuess
     var error = -1.0
     while (error < 0 || error > precision) {
-        lastGuess = guess
+        val out = function.bounded(guess)
         guess += (output - function(guess)) / derivative(guess)
-        error = abs(guess - lastGuess)
+        error = abs(out - guess)
     }
     return guess
 }
 
 fun newtonMethodSolve(
-    output: Double, function: BoundedFunction<Double>, precision: Double = 1e-14, dx: Double = 1e-14
+    output: Double,
+    function: BoundedFunction<Double>,
+    precision: Double = 1e-14,
+    dx: Double = 1e-14
 ): Double {
     val initialGuess = (function.upperBound() + function.lowerBound()) / 2
     var guess = initialGuess
