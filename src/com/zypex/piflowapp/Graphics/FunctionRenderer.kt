@@ -5,7 +5,8 @@ import javafx.scene.shape.StrokeLineCap
 import java.lang.NullPointerException
 import javafx.scene.paint.Color
 import utils.math.*
-import java.util.ArrayList
+import kotlin.math.pow
+import kotlin.math.sqrt
 
 class FunctionRenderer(var canvasX: Double, var canvasY: Double, var canvasW: Double, var canvasH: Double) {
     var resolution = 5.0 // In pixels
@@ -43,7 +44,7 @@ class FunctionRenderer(var canvasX: Double, var canvasY: Double, var canvasW: Do
                         val h = derivativePrecision
                         val xDerivative = (f.x(t + h) - tOfX) / h
                         val yDerivative = (f.y(t + h) - tOfY) / h
-                        pixelDistDerivative = Math.sqrt(Math.pow(xDerivative * xToCanvas, 2.0) + Math.pow(yDerivative * yToCanvas, 2.0))
+                        pixelDistDerivative = sqrt((xDerivative * xToCanvas).pow(2.0) + (yDerivative * yToCanvas).pow(2.0))
                         lastDerivative = pixelDistDerivative
                     } catch (e: InputOutOfDomainException) {
                         pixelDistDerivative = lastDerivative
@@ -70,14 +71,15 @@ class FunctionRenderer(var canvasX: Double, var canvasY: Double, var canvasW: Do
         val xToCanvas = canvasW / (maxX - minX)
         val yToCanvas = canvasH / (maxY - minY)
         val graphCenter = Vector((minX + maxX) / 2, (minY + maxY) / 2)
-        return Vector((x - graphCenter.x) * xToCanvas + canvasX + canvasW / 2, (graphCenter.y - y) * yToCanvas + canvasY + canvasH / 2)
+//        return Vector((x - graphCenter.x) * xToCanvas + canvasX + canvasW / 2, (graphCenter.y - y) * yToCanvas + canvasY + canvasH / 2)
+        return Vector((x - graphCenter.x) * xToCanvas + canvasX + canvasW / 2, (-y + graphCenter.y) * yToCanvas + canvasH / 2 + canvasY)
     }
 
     fun toFrame(x: Double, y: Double): Vector {
         val canvasToX = (maxX - minX) / canvasW
         val canvasToY = (maxY - minY) / canvasH
         val graphCenter = Vector((minX + maxX) / 2, (minY + maxY) / 2)
-        return Vector((x - canvasX - canvasW / 2) * canvasToX + graphCenter.x, (canvasH / 2 - canvasY - y) * canvasToY + graphCenter.y)
+        return Vector((x - canvasX - canvasW / 2) * canvasToX + graphCenter.x, (canvasH / 2 + canvasY - y) * canvasToY + graphCenter.y)
     }
 
     fun toCanvas(v: Vector): Vector {
@@ -88,12 +90,12 @@ class FunctionRenderer(var canvasX: Double, var canvasY: Double, var canvasW: Do
         return toFrame(v.x, v.y)
     }
 
-    fun renderInFrame(render: (GraphicsContext) -> Unit, gc: GraphicsContext) {
+    fun renderInFrame(gc: GraphicsContext, render: (GraphicsContext) -> Unit) {
         gc.save()
         val xToCanvas = canvasW / (maxX - minX)
         val yToCanvas = canvasH / (maxY - minY)
         val graphCenter = Vector((minX + maxX) / 2, (minY + maxY) / 2)
-        gc.translate(canvasX + canvasW / 2 - graphCenter.x * xToCanvas, canvasY + canvasH / 2 - graphCenter.y * yToCanvas)
+        gc.translate(canvasX + canvasW / 2 - graphCenter.x * xToCanvas, canvasY + canvasH / 2 + graphCenter.y * yToCanvas)
         gc.scale(xToCanvas, -yToCanvas)
         render(gc)
         gc.restore()
