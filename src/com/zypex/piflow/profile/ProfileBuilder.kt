@@ -401,30 +401,35 @@ fun newtonMethodSolve(
     derivative: (Double) -> Double,
     lowerBound: Double,
     upperBound: Double,
-    precision: Double = 1e-13
+    precision: Double = 1e-13,
+    initialGuess: Double = (upperBound + lowerBound) / 2
 ): Double =
     newtonMethodSolve(
         output,
         SingleBoundedFunction(function, lowerBound, upperBound),
         SingleBoundedFunction(derivative, lowerBound, upperBound),
-        precision
+        precision,
+        initialGuess
     )
 
 fun newtonMethodSolve(
     output: Double,
     function: BoundedFunction<Double>,
     derivative: BoundedFunction<Double>,
-    precision: Double = 1e-13
+    precision: Double = 1e-13,
+    initialGuess: Double = (function.upperBound() + function.lowerBound()) / 2
 ): Double {
 
-    val initialGuess = (function.upperBound() + function.lowerBound()) / 2
-    var guess = initialGuess
+    var guess = initialGuess.coerceIn(function.lowerBound()..function.upperBound())
     var error = -1.0
+
     while (error < 0 || error > precision) {
         val out = function.bounded(guess)
-        guess += (output - function(guess)) / derivative(guess)
-        error = abs(out - guess)
+        guess += (output - out) / derivative.bounded(guess)
+        guess = guess.coerceIn(function.bounds)
+        error = abs(output - out)
     }
+
     return guess
 }
 
@@ -432,18 +437,18 @@ fun newtonMethodSolve(
     output: Double,
     function: BoundedFunction<Double>,
     precision: Double = 1e-14,
-    dx: Double = 1e-14
+    initialGuess: Double = (function.upperBound() + function.lowerBound()) / 2
 ): Double {
-    val initialGuess = (function.upperBound() + function.lowerBound()) / 2
-    var guess = initialGuess
+    var guess = initialGuess.coerceIn(function.lowerBound()..function.upperBound())
     var error = -1.0
 
 
     while (error < 0 || error > precision) {
         val out = function(guess)
 
+        val dx = max(out * 1e-14, 1e-14)
         // dx is scaled by the output of the function in order to compensate for double rounding
-        val derivative = (function.bounded(guess + dx / 2 * out) - function.bounded(guess - dx / 2 * out)) / (dx * out)
+        val derivative = (function.bounded(guess + dx / 2) - function.bounded(guess - dx / 2 )) / (dx )
         val delta = (output - out) / derivative
 
         guess += delta

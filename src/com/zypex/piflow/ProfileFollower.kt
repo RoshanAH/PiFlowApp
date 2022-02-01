@@ -1,6 +1,7 @@
 package com.zypex.piflow
 
 import com.zypex.piflow.profile.*
+import utils.math.SingleBoundedFunction
 import kotlin.math.pow
 
 class ProfileFollower(var veloPIDF: PIDFConstants, var getPosition: () -> Double, var follow: (Double) -> Unit) {
@@ -12,6 +13,9 @@ class ProfileFollower(var veloPIDF: PIDFConstants, var getPosition: () -> Double
     private var pos = 0.0
     private var deltaTime = 0.0
 
+    var t = 0.0
+        private set
+
     var profile: DoubleProfile = DoubleProfile()
         set(value) {
             segNum = 0
@@ -22,19 +26,23 @@ class ProfileFollower(var veloPIDF: PIDFConstants, var getPosition: () -> Double
 
     var getVelocity: () -> Double = { (pos - lastPos) / deltaTime }
 
-    private var segNum = 0
+    var segNum = 0
+        private set
 
     private var error = 0.0
     private var totalError = 0.0
 
     fun update() {
         val time = System.nanoTime() * 1e-9
+        deltaTime = time - lastTime
+
+
         pos = getPosition()
         val vel = getVelocity()
 
-        deltaTime = time - lastTime
+        t = getT(pos)
 
-        val derivatives = profile(getT(pos))
+        val derivatives = profile(t)
 
         error = derivatives.velocity - vel
         deltaError = (error - lastError) / deltaTime
@@ -47,31 +55,35 @@ class ProfileFollower(var veloPIDF: PIDFConstants, var getPosition: () -> Double
     }
 
     private fun getT(pos: Double): Double {
+        if (profile.functions.isEmpty()) return 0.0
         if (pos < profile.functions[segNum].lower.position) return profile.functions[segNum].lowerBound()
 
-        for (i in segNum..profile.functions.size) {
+        for (i in segNum until profile.functions.size) {
             val f = profile.functions[i]
             if (pos <= f.upper.position) {
                 val lower = f.lower
-                val a = lower.jerk / 6.0
-                val b = lower.acceleration / 2.0
-                val c = lower.velocity
-                val d = lower.position
+                val lBound = f.lowerBound()
+                val j = lower.jerk
+                val a = lower.acceleration
+                val v = lower.velocity
+                val p = lower.position
+
+                val function: (Double) -> Double = { j / 6.0 * (it - lBound).pow(3.0) + a / 2.0 * (it - lBound).pow(2.0) + v * (it - lBound) + p }
+                val derivative: (Double) -> Double = { j / 2.0 * (it - lBound).pow(2.0) + a * (it - lBound) + v }
 
                 return newtonMethodSolve(
                     pos,
-                    { a * it.pow(3.0) + b * it.pow(2.0) + c * it + d },
-                    { 3.0 * a * it.pow(2.0) + 2.0 * b * it + c },
+                    function,
+                    derivative,
                     f.lowerBound(),
-                    f.upperBound()
+                    f.upperBound(),
+                    initialGuess = t.coerceAtLeast(1e-5)
                 )
             }
 
-            segNum++
+            if (segNum < profile.functions.size - 1) segNum++
         }
 
         return profile.upperBound()
     }
-
-    fun getTargetVel(pos: Double): Double = profile(getT(pos)).velocity
 }
