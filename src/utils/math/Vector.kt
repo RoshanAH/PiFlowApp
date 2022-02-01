@@ -1,6 +1,6 @@
 package utils.math
 
-class Vector(var x: Double, var y: Double) : Cloneable {
+open class Vector(var x: Double, var y: Double) : Cloneable {
     public override fun clone(): Vector {
         return Vector(x, y)
     }
