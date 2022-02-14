@@ -1,4 +1,8 @@
-package utils.math
+package com.zypex.piflow.math
+
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 
 open class Vector(var x: Double, var y: Double) : Cloneable {
     public override fun clone(): Vector {
@@ -7,14 +11,14 @@ open class Vector(var x: Double, var y: Double) : Cloneable {
 
     val magnitude: Double
         get() = Math.sqrt(x * x + y * y)
-    val theta: Double
-        get() = Math.atan2(y, x)
+    val theta: Angle
+        get() = atan2(y, x).rad
 
     fun setMagnitude(r: Double): Vector {
         val clone = clone()
         val theta = theta
-        clone.x = r * Math.cos(theta)
-        clone.y = r * Math.sin(theta)
+        clone.x = r * Math.cos(theta.rad)
+        clone.y = r * Math.sin(theta.rad)
         return clone
     }
 
@@ -26,10 +30,10 @@ open class Vector(var x: Double, var y: Double) : Cloneable {
         return clone
     }
 
-    fun rotate(theta: Double): Vector {
+    fun rotate(theta: Angle): Vector {
         val clone = clone()
-        clone.x = Math.cos(theta) * x - Math.sin(theta) * y
-        clone.y = Math.sin(theta) * x + Math.cos(theta) * y
+        clone.x = cos(theta.rad) * x - sin(theta.rad) * y
+        clone.y = sin(theta.rad) * x + cos(theta.rad) * y
         return clone
     }
 
