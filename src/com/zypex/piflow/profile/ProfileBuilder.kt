@@ -1,9 +1,12 @@
+@file:JvmName("ProfileBuilder")
+
 package com.zypex.piflow.profile
 
 import com.zypex.piflow.DriveConfig
 import com.zypex.piflow.MotionConstraints
-import com.zypex.piflow.path.Path
-import utils.math.*
+import com.zypex.piflow.math.*
+import com.zypex.piflow.profile.*
+import piflow.path.Path
 import kotlin.math.*
 
 typealias VecProfile = PiecewiseFunction<Derivatives<Vector>>
@@ -48,25 +51,40 @@ fun createLinear(profile: SingleBoundedFunction<Derivatives<Double>>, start: Vec
     return Linear(function)
 }
 
+
 fun createDisplacement(
-    dist: Double,
+    initialPos: Double,
+    finalPos: Double,
     initialSpeed: Double,
     finalSpeed: Double,
     maxSpeed: Double,
     config: MotionConstraints
-): DoubleProfile {
+): DoubleProfile = createDisplacement(
+    Derivatives(initialPos, initialSpeed, 0.0, 0.0),
+    Derivatives(finalPos, finalSpeed, 0.0, 0.0),
+    maxSpeed,
+    config
+)
+
+
+fun createDisplacement(
+    initial: Derivatives<Double>,
+    final: Derivatives<Double>,
+    maxSpeed: Double,
+    config: MotionConstraints
+): PiecewiseFunction<Derivatives<Double>> {
+    val dist = final.position - initial.position
     val finalMaxSpeed = maxSpeed.coerceAtMost(config.maxVelocity)
 
     val out = DoubleProfile()
-
     val maxIntermediate: Double =
-        createVelocityChange(initialSpeed, finalMaxSpeed, config).upper.position + createVelocityChange(
-            finalMaxSpeed, finalSpeed, config
+        createVelocityChange(initial.velocity, finalMaxSpeed, config).upper.position + createVelocityChange(
+            finalMaxSpeed, final.velocity, config
         ).upper.position
 
     if (maxIntermediate < dist) {
-        val speedUp = createVelocityChange(initialSpeed, finalMaxSpeed, config)
-        val relativeSlowDown = createVelocityChange(finalMaxSpeed, finalSpeed, config)
+        val speedUp = createVelocityChange(initial.velocity, finalMaxSpeed, config, initial.position)
+        val relativeSlowDown = createVelocityChange(finalMaxSpeed, final.velocity, config)
         val makeUpDist = dist - (speedUp.upper.position + relativeSlowDown.upper.position)
 
         val maintain =
@@ -80,14 +98,14 @@ fun createDisplacement(
 
         out.appendFunction(speedUp)
         out.appendFunction(maintain)
-        out.appendFunction(createVelocityChange(finalMaxSpeed, finalSpeed, config, maintain.upper.position))
+        out.appendFunction(createVelocityChange(finalMaxSpeed, final.velocity, config, maintain.upper.position))
     } else {
         val intermediateSpeed: Double
         val maxChange = 2 * config.maxAcceleration.pow(2) / config.maxJerk
-        val lowestSpeed = min(abs(initialSpeed), abs(finalSpeed))
-        val highestSpeed = max(abs(initialSpeed), abs(finalSpeed))
+        val lowestSpeed = min(abs(initial.velocity), abs(final.velocity))
+        val highestSpeed = max(abs(initial.velocity), abs(final.velocity))
 
-        val minDisplacement = createVelocityChange(initialSpeed, finalSpeed, config).upper.position
+        val minDisplacement = createVelocityChange(initial.velocity, final.velocity, config).upper.position
 
 //        This is the max amount of distance that could be traveled with acceleration never constant
         val doubleAccelDisplacement =
@@ -102,32 +120,51 @@ fun createDisplacement(
             ).upper.position
 
         if (dist < minDisplacement) {
-            throw ProfileOverconstrainedException("Distance $dist is too small to change from velocities $initialSpeed to $finalSpeed. Distance must either be $minDisplacement or the change in velocity must be lower") // TODO actually solve for the change in velocity here
+
+            val minVeloChange = newtonMethodSolve(
+                dist,
+                { createVelocityChange(initial.velocity, it, config).upper.position },
+                initial.velocity,
+                final.velocity
+            )
+
+            throw ProfileOverconstrainedException(dist, final.velocity - initial.velocity, minDisplacement, minVeloChange)
+
         } else if (dist < doubleAccelDisplacement && lowestSpeed + maxChange > highestSpeed) {
+
+            val accel: (Double) -> Double = {
+                val jdv = config.maxJerk * sign(it - initial.velocity)
+                val t = sqrt(config.maxJerk * abs(it - initial.velocity)) / config.maxJerk
+                4.0 / 3.0 * jdv * t.pow(3.0) + 2 * initial.velocity * t
+            }
+
+            val deccel: (Double) -> Double = {
+                val jdv = config.maxJerk * sign(final.velocity - it)
+                val t = sqrt(config.maxJerk * abs(final.velocity - it)) / config.maxJerk
+                4.0 / 3.0 * jdv * t.pow(3.0) + 2 * it * t
+            }
+
             intermediateSpeed = newtonMethodSolve(
-                dist, SingleBoundedFunction({
-                    createVelocityChange(initialSpeed, it, config).upper.position +
-                            createVelocityChange(it, finalSpeed, config).upper.position
-                }, highestSpeed - lowestSpeed, lowestSpeed + maxChange)
+                dist, { accel(it) + deccel(it) }, highestSpeed - lowestSpeed, lowestSpeed + maxChange
             )
         } else if (dist < singleAccelDisplacement) {
             intermediateSpeed = newtonMethodSolve(
                 dist, SingleBoundedFunction({
-                    createVelocityChange(initialSpeed, it, config).upper.position +
-                            createVelocityChange(it, finalSpeed, config).upper.position
+                    createVelocityChange(initial.velocity, it, config).upper.position +
+                            createVelocityChange(it, final.velocity, config).upper.position
                 }, lowestSpeed + maxChange, highestSpeed + maxChange)
             )
         } else {
             intermediateSpeed = newtonMethodSolve(
                 dist, SingleBoundedFunction({
-                    createVelocityChange(initialSpeed, it, config).upper.position +
-                            createVelocityChange(it, finalSpeed, config).upper.position
+                    createVelocityChange(initial.velocity, it, config).upper.position +
+                            createVelocityChange(it, final.velocity, config).upper.position
                 }, highestSpeed + maxChange, config.maxVelocity)
             )
         }
 
-        val speedUp = createVelocityChange(initialSpeed, intermediateSpeed, config)
-        val slowDown = createVelocityChange(intermediateSpeed, finalSpeed, config, speedUp.upper.position)
+        val speedUp = createVelocityChange(initial.velocity, intermediateSpeed, config, initial.velocity)
+        val slowDown = createVelocityChange(intermediateSpeed, final.velocity, config, speedUp.upper.position)
         out.appendFunction(speedUp)
         out.appendFunction(slowDown)
     }
@@ -141,12 +178,24 @@ fun createDisplacement(
 }
 
 fun createVelocityChange(
-    initialVel: Double, finalVel: Double, config: MotionConstraints, initialPos: Double = 0.0
-): PiecewiseFunction<Derivatives<Double>> {
+    initialVel: Double,
+    finalVel: Double,
+    config: MotionConstraints,
+    initialPos: Double = 0.0
+): DoubleProfile = createVelocityChange(initialPos, initialVel, 0.0, finalVel, config)
+
+fun createVelocityChange( // TODO add initial acceleration into this
+    initialPos: Double,
+    initialVel: Double,
+    initialAccel: Double,
+    finalVel: Double,
+    config: MotionConstraints,
+): DoubleProfile {
 
     val deltaVel = finalVel - initialVel
     val maxAccel = sign(deltaVel) * sqrt(config.maxJerk * abs(deltaVel))
     return if (abs(maxAccel) <= config.maxAcceleration) {
+
         val accelerate: BoundedFunction<Derivatives<Double>> = SingleBoundedFunction({
             Derivatives(
                 initialPos +
@@ -161,6 +210,7 @@ fun createVelocityChange(
                 config.maxJerk * sign(deltaVel) // Increasing accel
             )
         }, 0.0, abs(maxAccel) / config.maxJerk)
+
         val endPoint1 = accelerate.upper
         val decelerate: BoundedFunction<Derivatives<Double>> = SingleBoundedFunction({
             Derivatives(
@@ -230,7 +280,7 @@ fun createVelocityChange(
     }
 }
 
-fun createTurn(start: Vector, middle: Vector, end: Vector, config: DriveConfig, speed: Double): Arc {
+fun createTurn(start: Vector, middle: Vector, end: Vector, config: MotionConstraints, speed: Double): Arc {
     val center = findTurnCenter(start, middle, end, config, speed)
     val deltaStart = start.clone().subtract(middle)
     val deltaEnd = end.clone().subtract(middle)
@@ -239,42 +289,39 @@ fun createTurn(start: Vector, middle: Vector, end: Vector, config: DriveConfig, 
     val dir1 = deltaStart.clone().scale(tStart).add(middle).subtract(center).theta
     val dir2 = deltaEnd.clone().scale(tEnd).add(middle).subtract(center).theta
     return createArc(
-        center, dir1, dir2, sign(findAngleDifference(deltaStart.theta, deltaEnd.theta)).toInt(), config, speed
+        center, dir1, dir2, sign((deltaStart.theta - deltaEnd.theta).rad).toInt(), config, speed
     )
 }
 
 private fun createArc(
-    center: Vector, initialTheta: Double, finalTheta: Double, dir: Int, config: DriveConfig, speed: Double
+    center: Vector, initialTheta: Angle, finalTheta: Angle, dir: Int, config: MotionConstraints, speed: Double
 ): Arc {
-    val tSign = Integer.signum(dir)
-    val pi2 = 2 * Math.PI
-    val iMod = (initialTheta % pi2 + pi2) % pi2
-    val fMod = (finalTheta % pi2 + pi2) % pi2
-    val diff = (tSign * (fMod - iMod) % pi2 + pi2) % pi2
+    val tSign = dir.sign
+    val diff = (finalTheta - initialTheta).rad
     val coeff =
         if (config.maxJerk < config.maxAcceleration) sqrt(config.maxJerk / speed) else config.maxAcceleration / speed
 
     val function = SingleBoundedFunction({
         Derivatives(
             Vector(
-                speed / coeff * cos(tSign * coeff * it + initialTheta) + center.x,
-                speed / coeff * sin(tSign * coeff * it + initialTheta) + center.y
+                speed / coeff * cos(tSign * coeff * it + initialTheta.rad) + center.x,
+                speed / coeff * sin(tSign * coeff * it + initialTheta.rad) + center.y
             ), Vector(
-                -tSign * speed * sin(tSign * coeff * it + initialTheta),
-                tSign * speed * cos(tSign * coeff * it + initialTheta)
+                -tSign * speed * sin(tSign * coeff * it + initialTheta.rad),
+                tSign * speed * cos(tSign * coeff * it + initialTheta.rad)
             ), Vector(
-                -speed * coeff * cos(tSign * coeff * it + initialTheta),
-                -speed * coeff * sin(tSign * coeff * it + initialTheta)
+                -speed * coeff * cos(tSign * coeff * it + initialTheta.rad),
+                -speed * coeff * sin(tSign * coeff * it + initialTheta.rad)
             ), Vector(
-                tSign * speed * coeff * coeff * sin(tSign * coeff * it + initialTheta),
-                -tSign * speed * coeff * coeff * cos(tSign * coeff * it + finalTheta)
+                tSign * speed * coeff * coeff * sin(tSign * coeff * it + initialTheta.rad),
+                -tSign * speed * coeff * coeff * cos(tSign * coeff * it + finalTheta.rad)
             )
         )
     }, 0.0, abs(diff) / coeff)
     return Arc(function, coeff, speed, diff, tSign, center)
 }
 
-fun createInterpolation(points: List<Vector>, config: DriveConfig, speed: Double): List<Arc> {
+fun createInterpolation(points: List<Vector>, config: MotionConstraints, speed: Double): List<Arc> {
     require(points.size >= 4) { "An interpolation must have at least 2 turns" }
     val solutions: MutableList<Solution> = ArrayList()
     val r = findTurningRadius(config, speed)
@@ -328,7 +375,7 @@ fun createInterpolation(points: List<Vector>, config: DriveConfig, speed: Double
         val deltaEnd = points[2].subtract(points[1])
         arcs.add(
             createArc(
-                center, dir1, dir2, sign(findAngleDifference(deltaStart.theta, deltaEnd.theta)).toInt(), config, speed
+                center, dir1, dir2, sign((deltaStart.theta - deltaEnd.theta).rad).toInt(), config, speed
             )
         )
     }
@@ -351,7 +398,7 @@ fun createInterpolation(points: List<Vector>, config: DriveConfig, speed: Double
     return arcs
 }
 
-fun findTurnCenter(start: Vector, middle: Vector, end: Vector, config: DriveConfig, speed: Double): Vector {
+fun findTurnCenter(start: Vector, middle: Vector, end: Vector, config: MotionConstraints, speed: Double): Vector {
     val dir1 = start.clone().subtract(middle).normalize()
     val dir2 = end.clone().subtract(middle).normalize()
     val r = findTurningRadius(config, speed)
@@ -383,11 +430,38 @@ fun findAngleDifference(angle2: Double, angle1: Double): Double {
     else rawDiff - sign(rawDiff) * 2 * Math.PI
 }
 
-fun findTurningRadius(config: DriveConfig, speed: Double): Double {
+fun findTurningRadius(config: MotionConstraints, speed: Double): Double {
     val accel = config.maxAcceleration
     val jerk = config.maxJerk
     val coeff = if (jerk < accel) sqrt(jerk / speed) else accel / speed
     return speed / coeff
+}
+
+fun getDerivatives(
+    current: Derivatives<Double>,
+    target: Derivatives<Double>,
+    deltaTime: Double,
+    constraints: MotionConstraints
+): Derivatives<Double> = TODO()
+
+fun getDerivativesVelo(
+    current: Derivatives<Double>,
+    target: Double,
+    deltaTime: Double,
+    constraints: MotionConstraints
+): Derivatives<Double> {
+
+    val deltaVel = target - current.velocity
+    val deccelVel = 2 * current.acceleration / constraints.maxJerk
+
+    val jerkSign = sign(abs(deltaVel) - abs(deccelVel))
+
+    val jerk = jerkSign * constraints.maxJerk
+    val accel = current.acceleration + jerk * deltaTime
+    val velo = current.velocity + accel * deltaTime
+    val pos = current.position + velo * deltaTime
+
+    return Derivatives(pos, velo, accel, jerk)
 }
 
 fun quadraticSolve(a: Double, b: Double, c: Double): Pair<Double, Double> {
@@ -435,6 +509,15 @@ fun newtonMethodSolve(
 
 fun newtonMethodSolve(
     output: Double,
+    function: (Double) -> Double,
+    lowerBound: Double,
+    upperBound: Double,
+    precision: Double = 1e-14,
+    initialGuess: Double = (upperBound + lowerBound) / 2
+): Double = newtonMethodSolve(output, SingleBoundedFunction(function, lowerBound, upperBound), precision, initialGuess)
+
+fun newtonMethodSolve(
+    output: Double,
     function: BoundedFunction<Double>,
     precision: Double = 1e-14,
     initialGuess: Double = (function.upperBound() + function.lowerBound()) / 2
@@ -448,7 +531,7 @@ fun newtonMethodSolve(
 
         val dx = max(out * 1e-14, 1e-14)
         // dx is scaled by the output of the function in order to compensate for double rounding
-        val derivative = (function.bounded(guess + dx / 2) - function.bounded(guess - dx / 2 )) / (dx )
+        val derivative = (function.bounded(guess + dx / 2) - function.bounded(guess - dx / 2)) / (dx)
         val delta = (output - out) / derivative
 
         guess += delta
