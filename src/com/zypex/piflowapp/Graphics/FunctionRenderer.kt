@@ -4,7 +4,7 @@ import javafx.scene.canvas.GraphicsContext
 import javafx.scene.shape.StrokeLineCap
 import java.lang.NullPointerException
 import javafx.scene.paint.Color
-import utils.math.*
+import com.zypex.piflow.math.*
 import kotlin.math.pow
 import kotlin.math.sqrt
 

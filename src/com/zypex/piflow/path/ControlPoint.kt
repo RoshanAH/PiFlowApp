@@ -1,6 +1,7 @@
-package com.zypex.piflow.path
-import utils.math.*
+package piflow.path
 
-class ControlPoint(pos: Vector) : PathElement{
+import com.zypex.piflow.math.Vector
+
+class ControlPoint(pos: Vector) : PathElement {
     constructor(x: Double, y: Double) : this(Vector(x, y))
 }

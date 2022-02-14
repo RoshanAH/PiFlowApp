@@ -1,3 +1,3 @@
-package com.zypex.piflow.path
+package piflow.path
 
 interface PathElement 

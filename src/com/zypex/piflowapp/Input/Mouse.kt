@@ -1,6 +1,6 @@
 package com.zypex.piflowapp.Input
 
-import utils.math.Vector
+import com.zypex.piflow.math.Vector
 
 class Mouse : Vector(0.0, 0.0) {
 

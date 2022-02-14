@@ -1,6 +1,7 @@
 package com.zypex.piflow.path
 
-import utils.math.Vector
+import com.zypex.piflow.math.Vector
+import piflow.path.PathElement
 
 class WayPoint() : PathElement {
     var speed: Double? = null

@@ -1,7 +1,7 @@
 package com.zypex.piflowapp
 
 
-import com.zypex.piflow.DriveConfig
+import com.zypex.piflow.MotionConstraints
 import com.zypex.piflow.PIDFConstants
 import com.zypex.piflow.ProfileFollower
 import com.zypex.piflow.profile.*
@@ -20,14 +20,14 @@ import javafx.scene.paint.Color
 import javafx.scene.shape.StrokeLineCap
 import javafx.stage.Stage
 import javafx.util.Duration
-import utils.math.SingleBoundedFunction
-import utils.math.Vector
+import com.zypex.piflow.math.SingleBoundedFunction
+import com.zypex.piflow.math.Vector
 
 class Main : Application() {
     private lateinit var gc: GraphicsContext
     private val initialHeight = 600.0
     private val initialWidth = 600.0
-    private val config = DriveConfig(1.0, 10.0, 1.0)
+    private val config = MotionConstraints(1.0, 10.0, 1.0)
 
     override fun start(primaryStage: Stage) {
         primaryStage.title = "wait does this actually work?"
@@ -56,7 +56,7 @@ class Main : Application() {
     private var runTime: Double = 0.0
 
     private var follower: ProfileFollower = ProfileFollower(
-        PIDFConstants(0.1, 0.0, 0.0, 0.0),
+        PIDFConstants(0.1, 0.0, 0.0, 0.0, 0.0, 0.0),
         {
             renderer.toFrame(mouse).y
         },
@@ -128,7 +128,7 @@ class Main : Application() {
         val displacement = 10.0
 
         val start = System.nanoTime()
-        profile = createDisplacement(displacement, 0.0, 0.0, 50.0, config)
+        profile = createDisplacement(0.0, displacement, 0.0, 0.0, 1000.0, config)
         val end = System.nanoTime()
 
         println("Profile generation finished in " + ((end - start) / 1.0e6) + " milliseconds")
@@ -189,7 +189,7 @@ class Main : Application() {
 
         renderer.renderInFrame(gc) {
             val mousePos = renderer.toFrame(mouse)
-            val profilePos = Vector(follower.t, follower.profile(follower.t).position)
+            val profilePos = Vector(follower.t, follower.profile.bounded(follower.t).position)
             gc.strokeLine(profilePos.x, profilePos.y, profilePos.x, profilePos.y)
             gc.strokeLine(mousePos.x, mousePos.y, mousePos.x, mousePos.y)
 

@@ -1,4 +1,4 @@
-package utils.math
+package com.zypex.piflow.math
 
 
 class SingleBoundedFunction<T>(private val base: (Double) -> T,

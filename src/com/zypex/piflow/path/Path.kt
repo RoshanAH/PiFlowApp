@@ -1,4 +1,4 @@
-package com.zypex.piflow.path
+package piflow.path
 
 class Path {
     var elements: MutableList<PathElement> = ArrayList()

@@ -1,6 +1,7 @@
 package com.zypex.piflow.profile
 
-import utils.math.*
+import com.zypex.piflow.math.Vector
+
 
 class CompoundProfileSegment : ProfileSegment() {
     var segments: MutableList<ProfileSegment> = ArrayList()

@@ -1,4 +1,4 @@
-package utils.math
+package com.zypex.piflow.math
 
 interface BoundedFunction<T> : (Double) -> T {
     fun upperBound(): Double

@@ -1,7 +1,8 @@
 package com.zypex.piflow.profile
 
-import utils.math.SingleBoundedFunction
-import utils.math.Vector
+import com.zypex.piflow.math.SingleBoundedFunction
+import com.zypex.piflow.math.Vector
+
 
 abstract class SingleProfileSegment(val function: SingleBoundedFunction<Derivatives<Vector>>, override val length: Double) : ProfileSegment() {
     override fun upperBound(): Double {

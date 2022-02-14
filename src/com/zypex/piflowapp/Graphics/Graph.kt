@@ -3,7 +3,7 @@ package com.zypex.piflowapp.Graphics
 import javafx.scene.canvas.GraphicsContext
 
 import javafx.scene.paint.Color
-import utils.math.*
+import com.zypex.piflow.math.*
 import java.util.ArrayList
 
 class Graph {

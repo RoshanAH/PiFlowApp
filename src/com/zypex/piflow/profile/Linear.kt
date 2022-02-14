@@ -1,6 +1,7 @@
 package com.zypex.piflow.profile
 
-import utils.math.*
+import com.zypex.piflow.math.SingleBoundedFunction
+import com.zypex.piflow.math.Vector
 import kotlin.math.*
 
 class Linear @JvmOverloads internal constructor(function: SingleBoundedFunction<Derivatives<Vector>>, length: Double = function.upper.position.subtract(function.lower.position).magnitude) : SingleProfileSegment(function, length) {

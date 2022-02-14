@@ -1,8 +1,7 @@
 package com.zypex.piflow.profile
 
-import kotlin.Throws
-import java.lang.ClassCastException
-import utils.math.*
+import com.zypex.piflow.math.BoundedFunction
+import com.zypex.piflow.math.Vector
 
 abstract class ProfileSegment : BoundedFunction<Derivatives<Vector>> {
     abstract val length: Double
