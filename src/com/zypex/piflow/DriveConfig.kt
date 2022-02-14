@@ -1,6 +1,9 @@
 package com.zypex.piflow
 
-class DriveConfig(maxVelocity: Double, maxAcceleration: Double, maxJerk: Double) : MotionConstraints(maxVelocity, maxAcceleration, maxJerk) {
-    var turnSpeed = 1.0
-    var velocityPID: PIDFConstants = PIDFConstants(0.0, 0.0, 0.0, 0.0)
-}
+class DriveConfig(
+    maxVelocity: Double,
+    maxAcceleration: Double,
+    maxJerk: Double,
+    val pidf: PIDFConstants,
+    val turnPIDF: PIDFConstants
+) : MotionConstraints(maxVelocity, maxAcceleration, maxJerk)
